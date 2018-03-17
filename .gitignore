@@ -1,0 +1,52 @@
+*.py[cod]
+
+# C extensions
+*.so
+
+# Packages
+*.egg*
+dist
+build
+eggs
+.eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib
+!devstack/lib
+lib64
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+cover
+cover-master
+.testrepository
+*.sqlite
+.venv
+.cache
+.test_results/
+rally-cli-output-files/
+
+# Docs
+doc/source/_build/
+
+# Translations
+*.mo
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.idea
+.pydevproject
+*.swp
+
+# Mac Desktop Service Store
+*.DS_Store
