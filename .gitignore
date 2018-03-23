@@ -34,6 +34,7 @@ cover-master
 .cache
 .test_results/
 rally-cli-output-files/
+.pytest_cache
 
 # Docs
 doc/source/_build/
