@@ -1,0 +1,25 @@
+language: python
+matrix:
+  include:
+    # stylish checks
+    - python: 3.6
+      env:
+        JOB_NAME=pep8
+        TOXENV=pep8
+    # unittesting 2.7 - 3.6
+    - python: 2.7
+      env:
+        JOB_NAME=unittest
+        TOXENV=py27
+    - python: 3.5
+      env:
+        JOB_NAME=unittest
+        TOXENV=py35
+    - python: 3.6
+      env:
+        JOB_NAME=unittest
+        TOXENV=py36
+script:
+  - tox
+install:
+- pip install tox
