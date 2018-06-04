@@ -1,0 +1,6 @@
+existing@kubernetes:
+  server: https://192.168.99.100:8443
+  certificate-authority: ~/.minikube/ca.crt
+  client-certificate: ~/.minikube/client.crt
+  client-key: ~/.minikube/client.key
+  tls_insecure: False
