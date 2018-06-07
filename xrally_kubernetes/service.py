@@ -14,19 +14,20 @@
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
 from kubernetes.client.apis import core_v1_api
+from kubernetes.client.apis import version_api
 from rally.task import service
 
 
-class K8sClient(service.Service):
+class Kubernetes(service.Service):
     """A wrapper for python kubernetes client.
 
     This class handles different ways for initialization of kubernetesclient.
     """
 
     def __init__(self, spec, name_generator=None, atomic_inst=None):
-        super(K8sClient, self).__init__(None,
-                                        name_generator=name_generator,
-                                        atomic_inst=atomic_inst)
+        super(Kubernetes, self).__init__(None,
+                                         name_generator=name_generator,
+                                         atomic_inst=atomic_inst)
         self._spec = spec
 
         # NOTE(andreykurilin): KubernetesClient doesn't provide any __version__
@@ -48,7 +49,7 @@ class K8sClient(service.Service):
 
         config.host = self._spec["server"]
         config.ssl_ca_cert = self._spec["certificate-authority"]
-        if self._spec.get("api_key") and self._spec.get("api_key_prefix"):
+        if self._spec.get("api_key"):
             config.api_key["authorization"] = self._spec["api_key"]
             config.api_key_prefix["authorization"] = self._spec[
                 "api_key_prefix"]
@@ -65,3 +66,6 @@ class K8sClient(service.Service):
 
         self.api = api
         self.v1_client = core_v1_api.CoreV1Api(api)
+
+    def get_version(self):
+        return version_api.VersionApi(self.api).get_code().to_dict()

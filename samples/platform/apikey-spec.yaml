@@ -1,5 +1,5 @@
 existing@kubernetes:
-  server: https://192.168.99.100:8443
+  server: https://localhost:8443
   certificate-authority: ~/.minikube/ca.crt
-  api_key: API KEY
+  api_key: "API KEY"
   api_key_prefix: Bearer

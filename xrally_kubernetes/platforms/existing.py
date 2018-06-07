@@ -14,10 +14,9 @@
 
 import traceback
 
-from kubernetes.client.apis import version_api
 from rally.env import platform
 
-from xrally_kubernetes import kubernetesclient
+from xrally_kubernetes import service as k8s_service
 
 
 @platform.configure(name="existing", platform="kubernetes")
@@ -26,39 +25,60 @@ class KubernetesPlatform(platform.Platform):
 
     CONFIG_SCHEMA = {
         "type": "object",
-        "properties": {
-            "server": {
-                "type": "string",
-                "description": "An endpoint of Kubernetes API."
+        "oneOf": [
+            {
+                "description": "The auth-token authentication",
+                "properties": {
+                    "server": {
+                        "type": "string",
+                        "description": "An endpoint of Kubernetes API."
+                    },
+                    "certificate-authority": {
+                        "type": "string",
+                        "description": "Path to certificate authority"
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "API key for API key authorization"
+                    },
+                    "api_key_prefix": {
+                        "type": "string",
+                        "description": "API key prefix. Defaults to 'Bearer'."
+                    }
+                },
+                "required": ["server", "certificate-authority", "api_key"],
+                "additionalProperties": False
             },
-            "certificate-authority": {
-                "type": "string",
-                "description": "Path to certificate authority"
-            },
-            "client-certificate": {
-                "type": "string",
-                "description": "Path to client's certificate."
-            },
-            "client-key": {
-                "type": "string",
-                "description": "Path to client's key."
-            },
-            "tls_insecure": {
-                "type": "boolean",
-                "description": "Whether skip or not tls verification. "
-                               "Defaults to False."
-            },
-            "api_key": {
-                "type": "string",
-                "description": "API key for API key authorization"
-            },
-            "api_key_prefix": {
-                "type": "string",
-                "description": "API key prefix"
+            {
+                "description": "The authentication via client certificates.",
+                "properties": {
+                    "server": {
+                        "type": "string",
+                        "description": "An endpoint of Kubernetes API."
+                    },
+                    "certificate-authority": {
+                        "type": "string",
+                        "description": "Path to certificate authority"
+                    },
+                    "client-certificate": {
+                        "type": "string",
+                        "description": "Path to client's certificate."
+                    },
+                    "client-key": {
+                        "type": "string",
+                        "description": "Path to client's key."
+                    },
+                    "tls_insecure": {
+                        "type": "boolean",
+                        "description": "Whether skip or not tls verification. "
+                                       "Defaults to False."
+                    },
+                },
+                "required": ["server", "certificate-authority",
+                             "client-certificate", "client-key"],
+                "additionalProperties": False
             }
-        },
-        "required": ["server", "certificate-authority"],
-        "additionalProperties": False
+        ]
     }
 
     def create(self):
@@ -101,6 +121,5 @@ class KubernetesPlatform(platform.Platform):
         return {}
 
     def info(self):
-        service = kubernetesclient.K8sClient(self.platform_data)
-        version = version_api.VersionApi(service.api).get_code().to_dict()
+        version = k8s_service.Kubernetes(self.platform_data).get_version()
         return {"info": version}
