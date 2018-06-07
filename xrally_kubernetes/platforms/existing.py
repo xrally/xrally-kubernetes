@@ -12,29 +12,100 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from rally.common import cfg
-from rally.common import logging
+import traceback
+
 from rally.env import platform
 
-
-LOG = logging.getLogger(__name__)
-
-CONF = cfg.CONF
+from xrally_kubernetes import service as k8s_service
 
 
 @platform.configure(name="existing", platform="kubernetes")
-class Kubernetes(platform.Platform):
-    """Default plugin for Kubernetes platform
+class KubernetesPlatform(platform.Platform):
+    """Default plugin for Kubernetes."""
 
-    It may be used to test any existing Kubernetes API compatible cluster.
-    """
+    CONFIG_SCHEMA = {
+        "type": "object",
+        "oneOf": [
+            {
+                "description": "The auth-token authentication",
+                "properties": {
+                    "server": {
+                        "type": "string",
+                        "description": "An endpoint of Kubernetes API."
+                    },
+                    "certificate-authority": {
+                        "type": "string",
+                        "description": "Path to certificate authority"
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "API key for API key authorization"
+                    },
+                    "api_key_prefix": {
+                        "type": "string",
+                        "description": "API key prefix. Defaults to 'Bearer'."
+                    }
+                },
+                "required": ["server", "certificate-authority", "api_key"],
+                "additionalProperties": False
+            },
+            {
+                "description": "The authentication via client certificates.",
+                "properties": {
+                    "server": {
+                        "type": "string",
+                        "description": "An endpoint of Kubernetes API."
+                    },
+                    "certificate-authority": {
+                        "type": "string",
+                        "description": "Path to certificate authority"
+                    },
+                    "client-certificate": {
+                        "type": "string",
+                        "description": "Path to client's certificate."
+                    },
+                    "client-key": {
+                        "type": "string",
+                        "description": "Path to client's key."
+                    },
+                    "tls_insecure": {
+                        "type": "boolean",
+                        "description": "Whether skip or not tls verification. "
+                                       "Defaults to False."
+                    },
+                },
+                "required": ["server", "certificate-authority",
+                             "client-certificate", "client-key"],
+                "additionalProperties": False
+            }
+        ]
+    }
+
     def create(self):
-        # TBD
-        return {}, {}
+        # NOTE(andreykurilin): Let's save only paths to ca, key and cacert
+        #   instead of saving the actual content, since paths are what
+        #   KubernetesClient are actually expects to see. In further
+        #   development, it would be nice to hack these and store keys in the
+        #   Rally database.
+        self.spec.setdefault("tls_insecure", False)
+        return self.spec, {}
 
     def destroy(self):
-        # NOTE(boris-42): No action need to be performed.
+        # NOTE(prazumovsky): No action need to be performed.
         pass
+
+    def check_health(self):
+        """Check whatever platform is alive."""
+        try:
+            self.info()
+        except Exception as ex:
+            return {
+                "available": False,
+                "message": "Something went wrong: %s" % ex.message,
+                "traceback": traceback.format_exc()
+            }
+
+        return {"available": True}
 
     def cleanup(self, task_uuid=None):
         return {
@@ -46,14 +117,9 @@ class Kubernetes(platform.Platform):
             "errors": []
         }
 
-    def check_health(self):
-        """Check whatever platform is alive."""
-        # TBD
-        return {"available": True}
-
-    def info(self):
-        """Return information about cloud as dict."""
-        return {"info": {}}
-
     def _get_validation_context(self):
         return {}
+
+    def info(self):
+        version = k8s_service.Kubernetes(self.platform_data).get_version()
+        return {"info": version}
