@@ -15,6 +15,7 @@ from kubernetes import client as k8s_config
 from kubernetes.client import api_client
 from kubernetes.client.apis import core_v1_api
 from kubernetes.client.apis import version_api
+from rally.task import atomic
 from rally.task import service
 
 
@@ -69,3 +70,11 @@ class Kubernetes(service.Service):
 
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
+
+    @atomic.action_timer("kube.list_namespaces")
+    def list_namespaces(self):
+        """List namespaces."""
+        return [{"name": r.metadata.name,
+                 "uid": r.metadata.uid,
+                 "labels": r.metadata.labels}
+                for r in self.v1_client.list_namespace().items]

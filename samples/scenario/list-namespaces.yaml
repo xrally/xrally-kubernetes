@@ -1,0 +1,18 @@
+---
+version: 2
+title: Check listing namespaces
+subtasks:
+- title: Run a single workload with listing existing kubernetes namespaces
+  scenario:
+    Kubernetes.list_namespaces: {}
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+- title: Run listing existing kubernetes namespaces with rps runner
+  scenario:
+    Kubernetes.list_namespaces: {}
+  runner:
+    rps:
+      rps: 2
+      times: 10
