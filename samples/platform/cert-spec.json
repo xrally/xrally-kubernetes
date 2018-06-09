@@ -1,0 +1,9 @@
+{
+  "existing@kubernetes": {
+    "server": "https://localhost:8443",
+    "certificate-authority": "~/.minikube/ca.crt",
+    "client-certificate": "~/.minikube/client.crt",
+    "client-key": "~/.minikube/client.key",
+    "tls_insecure": false
+  }
+}

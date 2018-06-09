@@ -1,0 +1,8 @@
+{
+  "existing@kubernetes": {
+    "server": "https://localhost:8443",
+    "certificate-authority": "~/.minikube/ca.crt",
+    "api_key": "API KEY",
+    "api_key_prefix": "Bearer"
+  }
+}
