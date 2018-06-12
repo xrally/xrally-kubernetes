@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import os
 import traceback
 
 from rally.env import platform
@@ -87,6 +88,11 @@ class KubernetesPlatform(platform.Platform):
         #   KubernetesClient are actually expects to see. In further
         #   development, it would be nice to hack these and store keys in the
         #   Rally database.
+        for key in ("certificate-authority", "client-certificate",
+                    "client-key"):
+            if key in self.spec:
+                self.spec[key] = os.path.abspath(
+                    os.path.expanduser(self.spec[key]))
         self.spec.setdefault("tls_insecure", False)
         return self.spec, {}
 
