@@ -2,7 +2,13 @@
 # of appearance. Changing the order has an impact on the overall integration
 # process, which may cause wedges in the gate later.
 
+# NOTE(andreykurilin): Authors of 'requests' library decided to put upper
+#   limit for allowed 'urllib3' releases. To ensure that compatible version
+#   of 'urllib3' is installed for 'requests', we need to put 'requests' to the
+#   top of our dependency-list, otherwise 'pip' will use requirements for
+#   'urllib3' from the other package.
+requests                                           # Apache License Version 2.0
+
 rally>=0.11.0
 
 kubernetes>1.0.0                                   # Apache License Version 2.0
-urllib3<1.23,>=1.21.1                              # Apache License Version 2.0
