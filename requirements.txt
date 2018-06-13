@@ -2,6 +2,8 @@
 # of appearance. Changing the order has an impact on the overall integration
 # process, which may cause wedges in the gate later.
 
+setuptools-scm                                     # MIT
+
 # NOTE(andreykurilin): Authors of 'requests' library decided to put upper
 #   limit for allowed 'urllib3' releases. To ensure that compatible version
 #   of 'urllib3' is installed for 'requests', we need to put 'requests' to the
