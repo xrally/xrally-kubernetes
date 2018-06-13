@@ -107,7 +107,7 @@ class KubernetesPlatform(platform.Platform):
         except Exception as ex:
             return {
                 "available": False,
-                "message": "Something went wrong: %s" % ex.message,
+                "message": "Something went wrong: %s" % ex,
                 "traceback": traceback.format_exc()
             }
 
