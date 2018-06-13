@@ -51,9 +51,9 @@ class Kubernetes(service.Service):
         config.host = self._spec["server"]
         config.ssl_ca_cert = self._spec["certificate-authority"]
         if self._spec.get("api_key"):
-            config.api_key["authorization"] = self._spec["api_key"]
-            config.api_key_prefix["authorization"] = self._spec[
-                "api_key_prefix"]
+            config.api_key = {"authorization": self._spec["api_key"]}
+            config.api_key_prefix = {
+                "authorization": self._spec["api_key_prefix"]}
         else:
             config.cert_file = self._spec["client-certificate"]
             config.key_file = self._spec["client-key"]
