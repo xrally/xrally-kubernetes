@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "title": "Create, read and delete namespace with random name",
+  "subtasks": [
+    {
+      "title": "Run a single workload with create/read/delete namespace",
+      "scenario": {
+        "Kubernetes.create_and_delete_namespace": {}
+      },
+      "runner": {
+        "constant": {
+          "concurrency": 2,
+          "times": 10
+        }
+      }
+    },
+    {
+      "title": "Run create/read/delete namespace with rps runner",
+      "scenario": {
+        "Kubernetes.create_and_delete_namespace": {}
+      },
+      "runner": {
+        "rps": {
+          "rps": 2,
+          "times": 10
+        }
+      }
+    }
+  ]
+}

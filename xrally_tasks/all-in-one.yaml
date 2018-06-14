@@ -10,3 +10,11 @@ subtasks:
     constant:
       concurrency: 2
       times: 10
+
+- title: Run a single workload with create/read/delete namespace
+  scenario:
+    Kubernetes.create_and_delete_namespace: {}
+  runner:
+    constant:
+      concurrency: 2
+      times: 10

@@ -15,8 +15,87 @@ from kubernetes import client as k8s_config
 from kubernetes.client import api_client
 from kubernetes.client.apis import core_v1_api
 from kubernetes.client.apis import version_api
+from kubernetes.client import rest
+from rally.common import cfg
+from rally.common import logging
+from rally.common import utils as commonutils
+from rally import exceptions
 from rally.task import atomic
 from rally.task import service
+
+CONF = cfg.CONF
+LOG = logging.getLogger(__name__)
+
+
+def wait_for_status(name, status, read_method, resource_type=None, **kwargs):
+    """Util method for polling status until it won't be equals to `status`.
+
+    :param name: resource name
+    :param status: status waiting for
+    :param read_method: method to poll
+    :param resource_type: resource type for extended exceptions
+    :param kwargs: additional kwargs for read_method
+    """
+    sleep_time = CONF.kubernetes.status_poll_interval
+    retries_total = CONF.kubernetes.status_total_retries
+
+    commonutils.interruptable_sleep(CONF.kubernetes.start_prepoll_delay)
+
+    i = 0
+    while i < retries_total:
+        resp = read_method(name=name, **kwargs)
+        resp_id = resp.metadata.uid
+        current_status = resp.status.phase
+        if resp.status.phase != status:
+            i += 1
+            commonutils.interruptable_sleep(sleep_time)
+        else:
+            return
+        if i == retries_total:
+            raise exceptions.TimeoutException(
+                desired_status=status,
+                resource_name=name,
+                resource_type=resource_type,
+                resource_id=resp_id or "<no id>",
+                resource_status=current_status,
+                timeout=(retries_total * sleep_time))
+
+
+def wait_for_not_found(name, read_method, resource_type=None, **kwargs):
+    """Util method for polling status while resource exists.
+
+    :param name: resource name
+    :param read_method: method to poll
+    :param resource_type: resource type for extended exceptions
+    :param kwargs: additional kwargs for read_method
+    """
+    sleep_time = CONF.kubernetes.status_poll_interval
+    retries_total = CONF.kubernetes.status_total_retries
+
+    commonutils.interruptable_sleep(CONF.kubernetes.start_prepoll_delay)
+
+    i = 0
+    while i < retries_total:
+        try:
+            resp = read_method(name=name, **kwargs)
+            resp_id = resp.metadata.uid
+            current_status = resp.status.phase
+        except rest.ApiException as ex:
+            if ex.status == 404:
+                return
+            else:
+                raise
+        else:
+            commonutils.interruptable_sleep(sleep_time)
+            i += 1
+        if i == retries_total:
+            raise exceptions.TimeoutException(
+                desired_status="Terminated",
+                resource_name=name,
+                resource_type=resource_type,
+                resource_id=resp_id or "<no id>",
+                resource_status=current_status,
+                timeout=(retries_total * sleep_time))
 
 
 class Kubernetes(service.Service):
@@ -71,10 +150,63 @@ class Kubernetes(service.Service):
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
 
-    @atomic.action_timer("kube.list_namespaces")
+    @atomic.action_timer("kubernetes.list_namespaces")
     def list_namespaces(self):
         """List namespaces."""
         return [{"name": r.metadata.name,
                  "uid": r.metadata.uid,
                  "labels": r.metadata.labels}
                 for r in self.v1_client.list_namespace().items]
+
+    @atomic.action_timer("kubernetes.get_namespace")
+    def get_namespace(self, name):
+        """Get namespace status.
+
+        :param name: namespace name
+        """
+        return self.v1_client.read_namespace(name)
+
+    @atomic.action_timer("kubernetes.create_namespace")
+    def create_namespace(self, name, status_wait=True):
+        """Create namespace and wait until status phase won't be Active.
+
+        :param name: namespace name
+        :param status_wait: wait namespace for Active status
+        """
+        name = name or self.generate_random_name()
+
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": name,
+                "labels": {
+                    "role": name
+                }
+            }
+        }
+        self.v1_client.create_namespace(body=manifest)
+
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_for_nc_become_active"):
+                wait_for_status(name,
+                                status="Active",
+                                read_method=self.get_namespace)
+        return name
+
+    @atomic.action_timer("kubernetes.delete_namespace")
+    def delete_namespace(self, name, status_wait=True):
+        """Delete namespace and wait it's full termination.
+
+        :param name: namespace name
+        :param status_wait: wait namespace for termination
+        """
+        self.v1_client.delete_namespace(name=name,
+                                        body=k8s_config.V1DeleteOptions())
+
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_namespace_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_namespace)

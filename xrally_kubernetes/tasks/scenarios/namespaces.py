@@ -43,3 +43,17 @@ class ListNamespaces(common_scenario.BaseKubernetesScenario):
                     "title": "Namespaces",
                     "chart_plugin": "TextArea",
                     "data": ["No namespaces are available."]})
+
+
+@scenario.configure(name="Kubernetes.create_and_delete_namespace",
+                    platform="kubernetes")
+class CreateAndDeleteNamespace(common_scenario.BaseKubernetesScenario):
+
+    def run(self, name=None, status_wait=True):
+        """Create namespace, wait until it won't be active and then delete it.
+
+        :param name: namespace custom name
+        :param status_wait: wait namespace status after creation
+        """
+        name = self.client.create_namespace(name, status_wait=status_wait)
+        self.client.delete_namespace(name, status_wait=status_wait)

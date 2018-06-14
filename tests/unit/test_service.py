@@ -14,8 +14,14 @@
 
 import mock
 
+from kubernetes.client import rest
+from rally.common import cfg
+from rally import exceptions as rally_exc
+
 from tests.unit import test
 from xrally_kubernetes import service
+
+CONF = cfg.CONF
 
 
 class KubernetesServiceTestCase(test.TestCase):
@@ -44,6 +50,20 @@ class KubernetesServiceTestCase(test.TestCase):
         self.client_cls = p_mock_client.start()
         self.client = self.client_cls.return_value
         self.addCleanup(p_mock_client.stop)
+
+        CONF.set_override("status_poll_interval", 0, "kubernetes")
+        CONF.set_override("status_total_retries", 1, "kubernetes")
+        CONF.set_override("start_prepoll_delay", 0, "kubernetes")
+
+    @property
+    def k8s_client(self):
+        spec = {
+            "api_key_prefix": "stub_prefix",
+            "api_key": "stub_key",
+            "server": "stub_server",
+            "certificate-authority": "stub_auth"
+        }
+        return service.Kubernetes(spec)
 
     def test__init__kubernetes_version(self):
         from kubernetes import client as k8s_config
@@ -178,3 +198,175 @@ class KubernetesServiceTestCase(test.TestCase):
         list_ns = k8s_client.list_namespaces()
 
         self.assertEqual(expected, list_ns)
+
+    def test_create_namespace(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_namespace("test", status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": "test",
+                "labels": {
+                    "role": "test"
+                }
+            }
+        }
+        self.client.create_namespace.assert_called_once_with(body=expected)
+
+    def test_create_and_wait_namespace_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Active"
+        self.client.read_namespace.return_value = read_resp
+
+        self.k8s_client.create_namespace("test", status_wait=True)
+
+        self.client.create_namespace.assert_called_once()
+        self.client.read_namespace.assert_called_once_with("test")
+
+    def test_create_and_wait_namespace_fail_create(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespace.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_namespace,
+            "test",
+            status_wait=True
+        )
+
+        self.client.create_namespace.assert_called_once()
+        self.assertEqual(0, self.client.read_namespace.call_count)
+
+    def test_create_and_wait_namespace_fail_read(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespace.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_namespace,
+            "test",
+            status_wait=True
+        )
+
+        self.client.create_namespace.assert_called_once()
+        self.client.read_namespace.assert_called_once()
+
+    def test_create_and_wait_namespace_read_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Pending"
+        self.client.read_namespace.return_value = read_resp
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.create_namespace,
+            "test",
+            status_wait=True
+        )
+
+        self.client.create_namespace.assert_called_once()
+        self.assertEqual(2, self.client.read_namespace.call_count)
+
+    def test_delete_namespace(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        from kubernetes import client as k8s_config
+
+        self.k8s_client.delete_namespace("test", status_wait=False)
+
+        self.client.delete_namespace.assert_called_once_with(
+            body=k8s_config.V1DeleteOptions(),
+            name="test"
+        )
+
+    def test_delete_namespace_and_wait_termination_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespace.side_effect = [
+            rest.ApiException(status=404, reason="Not found")
+        ]
+
+        self.k8s_client.delete_namespace("test")
+
+        self.client.delete_namespace.assert_called_once()
+        self.client.read_namespace.assert_called_once_with("test")
+
+    def test_delete_namespace_and_wait_termination_delete_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespace.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_namespace,
+            "test"
+        )
+
+        self.client.delete_namespace.assert_called_once()
+        self.assertEqual(0, self.client.read_namespace.call_count)
+
+    def test_delete_namespace_and_wait_termination_read_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespace.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_namespace,
+            "test"
+        )
+
+        self.client.delete_namespace.assert_called_once()
+        self.client.read_namespace.assert_called_once()
+
+    def test_delete_namespace_and_wait_termination_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.delete_namespace,
+            "test"
+        )
+
+        self.client.delete_namespace.assert_called_once()
+        self.assertEqual(2, self.client.read_namespace.call_count)
