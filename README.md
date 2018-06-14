@@ -32,7 +32,7 @@ Check env availbility by the following command:
 ```console
 rally env check
 ```
-
+ 
 ## Where the tasks and bugs are tracked ?!
 
 The primary tracking system is

@@ -14,6 +14,8 @@
 
 import mock
 
+from kubernetes.client import rest
+
 from tests.unit import test
 from xrally_kubernetes.tasks.scenarios import namespaces
 
@@ -63,3 +65,43 @@ class ListNamespacesTestCase(test.TestCase):
             "chart_plugin": "TextArea",
             "data": ["No namespaces are available."]
         }], scenario._output["complete"])
+
+
+class CreateAndDeleteNamespaceTestCase(test.TestCase):
+
+    def test_create_and_delete_success(self):
+        client = mock.MagicMock()
+        client.create_namespace.return_value = "a"
+
+        scenario = namespaces.CreateAndDeleteNamespace()
+        scenario.generate_random_name = mock.MagicMock()
+        scenario.client = client
+        scenario.run()
+
+        client.create_namespace.assert_called_once_with(None, status_wait=True)
+        client.delete_namespace.assert_called_once_with("a", status_wait=True)
+
+    def test_create_failed(self):
+        client = mock.MagicMock()
+        client.create_namespace.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+        scenario = namespaces.CreateAndDeleteNamespace()
+        scenario.generate_random_name = mock.MagicMock()
+        scenario.client = client
+        self.assertRaises(rest.ApiException, scenario.run)
+        client.create_namespace.assert_called_once_with(None, status_wait=True)
+        self.assertEqual(0, client.delete_namespace.call_count)
+
+    def test_delete_failed(self):
+        client = mock.MagicMock()
+        client.create_namespace.return_value = "a"
+        client.delete_namespace.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+        scenario = namespaces.CreateAndDeleteNamespace()
+        scenario.generate_random_name = mock.MagicMock()
+        scenario.client = client
+        self.assertRaises(rest.ApiException, scenario.run)
+        client.create_namespace.assert_called_once_with(None, status_wait=True)
+        client.delete_namespace.assert_called_once_with("a", status_wait=True)

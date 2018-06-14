@@ -46,7 +46,7 @@ setuptools.setup(
     entry_points={
         "rally_plugins": [
             "path = xrally_kubernetes",
-            #"options = xrally_kubernetes.common.opts:list_opts"
+            "options = xrally_kubernetes.common.opts:list_opts"
         ]
     },
     install_requires=read_requirements("requirements.txt"),
