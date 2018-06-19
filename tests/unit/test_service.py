@@ -370,3 +370,44 @@ class KubernetesServiceTestCase(test.TestCase):
 
         self.client.delete_namespace.assert_called_once()
         self.assertEqual(2, self.client.read_namespace.call_count)
+
+    def test_create_spec_from_file(self):
+        from kubernetes.config import kube_config
+        patcher = mock.patch('os.path.exists')
+        mock_thing = patcher.start()
+        mock_thing.return_value = True
+        kube_config.load_kube_config = mock.MagicMock()
+        self.config_cls.reset_mock()
+
+        self.config.host = "stub host"
+        self.config.ssl_ca_cert = "stub crt"
+        self.config.api_key = {"authorization": "stub"}
+        self.config.api_key_prefix = {}
+        self.config.cert_file = "client crt"
+        self.config.key_file = "client key"
+        self.config.verify_ssl = False
+
+        expected = {
+            "host": "stub host",
+            "certificate-authority": "stub crt",
+            "api_key": {"authorization": "stub"},
+            "api_key_prefix": {},
+            "client-certificate": "client crt",
+            "client-key": "client key",
+            "tls_insecure": False
+        }
+        self.assertEqual(expected, service.Kubernetes.create_spec_from_file())
+        patcher.stop()
+
+    def test_create_spec_from_file_not_found(self):
+        from kubernetes.config import kube_config
+        patcher = mock.patch('os.path.exists')
+        mock_thing = patcher.start()
+        mock_thing.return_value = False
+        kube_config.load_kube_config = mock.MagicMock()
+        self.config_cls.reset_mock()
+
+        self.assertEqual({}, service.Kubernetes.create_spec_from_file())
+        kube_config.load_kube_config.assert_not_called()
+        self.config_cls.assert_not_called()
+        patcher.stop()

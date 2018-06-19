@@ -11,6 +11,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import os
+
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
 from kubernetes.client.apis import core_v1_api
@@ -131,8 +133,9 @@ class Kubernetes(service.Service):
         config.ssl_ca_cert = self._spec["certificate-authority"]
         if self._spec.get("api_key"):
             config.api_key = {"authorization": self._spec["api_key"]}
-            config.api_key_prefix = {
-                "authorization": self._spec["api_key_prefix"]}
+            if self._spec.get("api_key_prefix"):
+                config.api_key_prefix = {
+                    "authorization": self._spec["api_key_prefix"]}
         else:
             config.cert_file = self._spec["client-certificate"]
             config.key_file = self._spec["client-key"]
@@ -149,6 +152,26 @@ class Kubernetes(service.Service):
 
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
+
+    @classmethod
+    def create_spec_from_file(cls):
+        from kubernetes.config import kube_config
+
+        if not os.path.exists(os.path.expanduser(
+                kube_config.KUBE_CONFIG_DEFAULT_LOCATION)):
+            return {}
+
+        kube_config.load_kube_config()
+        k8s_cfg = k8s_config.Configuration()
+        return {
+            "host": k8s_cfg.host,
+            "certificate-authority": k8s_cfg.ssl_ca_cert,
+            "api_key": k8s_cfg.api_key,
+            "api_key_prefix": k8s_cfg.api_key_prefix,
+            "client-certificate": k8s_cfg.cert_file,
+            "client-key": k8s_cfg.key_file,
+            "tls_insecure": k8s_cfg.verify_ssl
+        }
 
     @atomic.action_timer("kubernetes.list_namespaces")
     def list_namespaces(self):
