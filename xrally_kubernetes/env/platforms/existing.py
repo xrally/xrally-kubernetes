@@ -129,3 +129,128 @@ class KubernetesPlatform(platform.Platform):
     def info(self):
         version = k8s_service.Kubernetes(self.platform_data).get_version()
         return {"info": version}
+
+    @classmethod
+    def _get_doc(cls):
+        doc = cls.__doc__.strip()
+        doc += "\n **Create a spec based on system environment.**\n"
+        # cut the first line since we already included the first line of it.
+        doc += "\n".join(
+            [line.strip() for line in
+             cls.create_spec_from_sys_environ.__doc__.split("\n")][1:])
+        return doc
+
+    @classmethod
+    def create_spec_from_sys_environ(cls, sys_environ):
+        """Create a spec based on system environment.
+
+        The environment variables could be defined with two mutually exclusive
+        mandatory ways: check kubeconfig file or kubeconfig envvar, defining
+        certificates or defining auth token.
+
+        To search configuration in kubeconfig file, rally checks standard
+        `$HOME/.kube/config` file or get `KUBECONFIG` envvar.
+
+        To define certificates to connect next variables used:
+
+          .. envvar:: KUBERNETES_HOST
+              The URL to the Kubernetes host.
+          .. envvar:: KUBERNETES_TLS_INSECURE
+              Not to verify the host against a CA certificate.
+          .. envvar:: KUBERNETES_CERT_AUTH
+              A path to a file containing TLS certificate to use when
+              connecting to the Kubernetes host.
+          .. envvar:: KUBERNETES_CLIENT_CERT
+              A path to a file containing client certificate to use when
+              connecting to the Kubernetes host.
+          .. envvar:: KUBERNETES_CLIENT_KEY
+              A path to a file containing client key to use when connecting to
+              the Kubernetes host.
+
+        To define auth token to connect next variables used:
+
+          .. envvar:: KUBERNETES_HOST
+              The URL to the Kubernetes host.
+          .. envvar:: KUBERNETES_CERT_AUTH
+              A path to a file containing TLS certificate to use when
+              connecting to the Kubernetes host.
+          .. envvar:: KUBERNETES_API_KEY
+              Client API key to use as token when connecting to the Kubernetes
+              host.
+          .. envvar:: KUBERNETES_API_KEY_PREFIX
+              Client API key prefix to use in token when connecting to the
+              Kubernetes host.
+        """
+        k8s_cfg = k8s_service.Kubernetes.create_spec_from_file()
+
+        host = k8s_cfg.get("host") or sys_environ.get("KUBERNETES_HOST")
+        cert_auth = (k8s_cfg.get("certificate-authority") or
+                     sys_environ.get("KUBERNETES_CERT_AUTH"))
+
+        if not (host and cert_auth):
+            return {
+                "available": False,
+                "message": "sys-env has no KUBERNETES_HOST or "
+                           "KUBERNETES_CERT_AUTH vars"
+            }
+
+        cert_auth = os.path.abspath(os.path.expanduser(cert_auth))
+
+        # If tls_insecure in env vars, True if it has any value
+        tls_insecure = (k8s_cfg.get("tls_insecure") or
+                        sys_environ.get("KUBERNETES_TLS_INSECURE"))
+        if tls_insecure == "":
+            tls_insecure = False
+        else:
+            tls_insecure = tls_insecure is not None
+
+        ckey = (k8s_cfg.get("client-key") or
+                sys_environ.get("KUBERNETES_CLIENT_KEY"))
+        ccert = (k8s_cfg.get("client-certificate") or
+                 sys_environ.get("KUBERNETES_CLIENT_CERT"))
+
+        if ckey and ccert:
+            ckey = os.path.abspath(os.path.expanduser(ckey))
+            ccert = os.path.abspath(os.path.expanduser(ccert))
+            return {
+                "available": True,
+                "spec": {
+                    "server": host,
+                    "certificate-authority": cert_auth,
+                    "client-certificate": ccert,
+                    "client-key": ckey,
+                    "tls_insecure": tls_insecure
+                }
+            }
+
+        if k8s_cfg.get("api_key"):
+            api_key = k8s_cfg["api_key"].get("authorization")
+        else:
+            api_key = sys_environ.get("KUBERNETES_API_KEY")
+        if k8s_cfg.get("api_key_prefix"):
+            api_key_prefix = k8s_cfg["api_key_prefix"].get("authorization")
+        else:
+            api_key_prefix = sys_environ.get("KUBERNETES_API_KEY_PREFIX")
+
+        if api_key:
+            spec = {
+                "server": host,
+                "certificate-authority": cert_auth,
+                "api_key": api_key
+            }
+            if api_key_prefix:
+                spec["api_key_prefix"] = api_key_prefix
+            return {
+                "available": True,
+                "spec": spec
+            }
+
+        return {"available": False,
+                "message": "Missing required env variables: "
+                           "%(crt)s or %(api)s" % {
+                               "crt": ["KUBERNETES_CLIENT_CERT",
+                                       "KUBERNETES_CLIENT_KEY",
+                                       "KUBERNETES_TLS_INSECURE"],
+                               "api": ["KUBERNETES_API_KEY",
+                                       "KUBERNETES_API_KEY_PREFIX"]
+                           }}
