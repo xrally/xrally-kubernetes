@@ -411,3 +411,42 @@ class KubernetesServiceTestCase(test.TestCase):
         kube_config.load_kube_config.assert_not_called()
         self.config_cls.assert_not_called()
         patcher.stop()
+
+    def test_create_serviceaccount(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": "test"
+            }
+        }
+        self.k8s_client.create_serviceaccount("test", namespace="ns")
+        self.client.create_namespaced_service_account.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_secret(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": "test",
+                "annotations": {
+                    "kubernetes.io/service-account.name": "test"
+                }
+            }
+        }
+        self.k8s_client.create_secret("test", namespace="ns")
+        self.client.create_namespaced_secret.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )

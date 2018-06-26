@@ -17,6 +17,13 @@
  
 -->
 
+## [1.0.0]
+
+**Added**
+
+* [context plugin] namespaces - create number of namespaces (with
+  non-default serviceAccounts optionally)
+
 ## [1.0.0] - 2018-06-26
 
 The start. Initial release. Have fun! ;)

@@ -233,3 +233,40 @@ class Kubernetes(service.Service):
                                     "kubernetes.wait_namespace_termination"):
                 wait_for_not_found(name,
                                    read_method=self.get_namespace)
+
+    @atomic.action_timer("kubernetes.create_serviceaccount")
+    def create_serviceaccount(self, name, namespace):
+        """Create serviceAccount for namespace.
+
+        :param name: serviceAccount name
+        :param namespace: namespace where sa should be created
+        """
+        sa_manifest = {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": name
+            }
+        }
+        self.v1_client.create_namespaced_service_account(namespace=namespace,
+                                                         body=sa_manifest)
+
+    @atomic.action_timer("kubernetes.create_secret")
+    def create_secret(self, name, namespace):
+        """Create secret with token for namespace.
+
+        :param name: secret name
+        :param namespace: namespace where secret should be created
+        """
+        secret_manifest = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": name,
+                "annotations": {
+                    "kubernetes.io/service-account.name": name
+                }
+            }
+        }
+        self.v1_client.create_namespaced_secret(namespace=namespace,
+                                                body=secret_manifest)
