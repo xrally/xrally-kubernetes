@@ -270,3 +270,83 @@ class Kubernetes(service.Service):
         }
         self.v1_client.create_namespaced_secret(namespace=namespace,
                                                 body=secret_manifest)
+
+    @atomic.action_timer("kubernetes.get_pod")
+    def get_pod(self, name, namespace):
+        """Get pod status.
+
+        :param name: pod's name
+        :param namespace: pod's namespace
+        """
+        return self.v1_client.read_namespaced_pod(name, namespace=namespace)
+
+    @atomic.action_timer("kubernetes.create_pod")
+    def create_pod(self, name, image, namespace, command=None,
+                   status_wait=True):
+        """Create pod and wait until status phase won't be Running.
+
+        :param name: pod's custom name
+        :param image: pod's image
+        :param namespace: chosen namespace to create pod into
+        :param command: array of strings which represents container command
+        :param status_wait: wait pod for Running status
+        """
+        name = name or self.generate_random_name()
+
+        container_spec = {
+            "name": name,
+            "image": image
+        }
+        if command is not None and isinstance(command, (list, tuple)):
+            container_spec["command"] = list(command)
+
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": name,
+                "labels": {
+                    "role": self._spec.get("env_id") or name
+                }
+            },
+            "spec": {
+                "serviceAccountName": namespace,
+                "containers": [container_spec]
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["serviceAccountName"]
+
+        self.v1_client.create_namespaced_pod(body=manifest,
+                                             namespace=namespace)
+
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_for_pod_become_running"):
+                wait_for_status(name,
+                                status="Running",
+                                read_method=self.get_pod,
+                                namespace=namespace)
+        return name
+
+    @atomic.action_timer("kubernetes.delete_pod")
+    def delete_pod(self, name, namespace, status_wait=True):
+        """Delete pod and wait it's full termination.
+
+        :param name: pod's name
+        :param namespace: pod's namespace
+        :param status_wait: wait pod for termination
+        """
+        self.v1_client.delete_namespaced_pod(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_pod_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_pod,
+                                   namespace=namespace)

@@ -1,0 +1,28 @@
+---
+version: 2
+title: Create, read and delete pod with random name
+subtasks:
+- title: Run a single workload with create/read/delete pod
+  scenario:
+    Kubernetes.create_and_delete_pod:
+      image: kubernetes/pause
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+- title: Run create/read/delete pod with rps runner
+  scenario:
+    Kubernetes.create_and_delete_pod:
+      image: kubernetes/pause
+  runner:
+    rps:
+      rps: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true

@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import random
 import string
 
 from rally.common.plugin import plugin
@@ -28,10 +29,23 @@ class BaseKubernetesScenario(scenario.Scenario):
     RESOURCE_NAME_FORMAT = "rally-XXXXXXXX-XXXXXXXX"
     RESOURCE_NAME_ALLOWED_CHARACTERS = string.ascii_lowercase + string.digits
 
+    def choose_namespace(self):
+        if self.context["kubernetes"]["namespace_choice_method"] == "random":
+            return random.choice(self.context["kubernetes"]["namespaces"])
+        elif (self.context["kubernetes"]["namespace_choice_method"] ==
+              "round_robin"):
+            idx = self.context["iteration"] - 1
+            idx = idx % len(self.context["kubernetes"]["namespaces"])
+            return self.context["kubernetes"]["namespaces"][idx]
+
     def __init__(self, context=None):
         super(BaseKubernetesScenario, self).__init__(context)
-        spec = {"namespaces": self.context.get("namespaces"),
-                "serviceaccounts": self.context.get("serviceaccounts")}
+        self.context.setdefault("kubernetes", {})
+        spec = {
+            "namespaces": self.context["kubernetes"].get("namespaces"),
+            "serviceaccounts": self.context["kubernetes"].get(
+                "serviceaccounts")
+        }
         if "env" in self.context:
             spec.update(self.context["env"]["platforms"]["kubernetes"])
             self.client = k8s_service.Kubernetes(

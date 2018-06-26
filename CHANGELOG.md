@@ -23,6 +23,7 @@
 
 * [context plugin] namespaces - create number of namespaces (with
   non-default serviceAccounts optionally)
+* [scenario plugin] Kubernetes.create_and_delete_pod
 
 ## [1.0.0] - 2018-06-26
 
