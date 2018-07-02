@@ -411,3 +411,356 @@ class KubernetesServiceTestCase(test.TestCase):
         kube_config.load_kube_config.assert_not_called()
         self.config_cls.assert_not_called()
         patcher.stop()
+
+    def test_create_serviceaccount(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": "test"
+            }
+        }
+        self.k8s_client.create_serviceaccount("test", namespace="ns")
+        self.client.create_namespaced_service_account.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_secret(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": "test",
+                "annotations": {
+                    "kubernetes.io/service-account.name": "test"
+                }
+            }
+        }
+        self.k8s_client.create_secret("test", namespace="ns")
+        self.client.create_namespaced_secret.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_pod(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image"
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_pod_with_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            command=["ls"],
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image",
+                        "command": ["ls"]
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_pod_with_incorrect_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            command="ls",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image"
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_pod_with_sa(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        client = self.k8s_client
+        client._spec["serviceaccounts"] = True
+        client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "serviceAccountName": "ns",
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image"
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_and_wait_pod_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Running"
+        self.client.read_namespaced_pod.return_value = read_resp
+
+        self.k8s_client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            status_wait=True
+        )
+
+        self.client.create_namespaced_pod.assert_called_once()
+        self.client.read_namespaced_pod.assert_called_once_with(
+            "name",
+            namespace="ns"
+        )
+
+    def test_create_and_wait_pod_fail_create(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespaced_pod.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_pod,
+            "name",
+            image="test/image",
+            namespace="ns",
+            status_wait=True
+        )
+
+        self.client.create_namespaced_pod.assert_called_once()
+        self.assertEqual(0, self.client.read_namespaced_pod.call_count)
+
+    def test_create_and_wait_pod_fail_read(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_pod.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_pod,
+            "name",
+            image="test/image",
+            namespace="ns",
+            status_wait=True
+        )
+
+        self.client.create_namespaced_pod.assert_called_once()
+        self.client.read_namespaced_pod.assert_called_once()
+
+    def test_create_and_wait_pod_read_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Pending"
+        self.client.read_namespace.return_value = read_resp
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.create_pod,
+            "name",
+            image="test/image",
+            namespace="ns",
+            status_wait=True
+        )
+
+        self.client.create_namespaced_pod.assert_called_once()
+        self.assertEqual(2, self.client.read_namespaced_pod.call_count)
+
+    def test_delete_pod(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        from kubernetes import client as k8s_config
+
+        self.k8s_client.delete_pod("test", namespace="ns", status_wait=False)
+
+        self.client.delete_namespaced_pod.assert_called_once_with(
+            "test",
+            body=k8s_config.V1DeleteOptions(),
+            namespace="ns"
+        )
+
+    def test_delete_pod_and_wait_termination_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_pod.side_effect = [
+            rest.ApiException(status=404, reason="Not found")
+        ]
+
+        self.k8s_client.delete_pod("test", namespace="ns")
+
+        self.client.delete_namespaced_pod.assert_called_once()
+        self.client.read_namespaced_pod.assert_called_once_with(
+            "test", namespace="ns")
+
+    def test_delete_pod_and_wait_termination_delete_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespaced_pod.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_pod,
+            "test",
+            namespace="ns"
+        )
+
+        self.client.delete_namespaced_pod.assert_called_once()
+        self.assertEqual(0, self.client.read_namespaced_pod.call_count)
+
+    def test_delete_pod_and_wait_termination_read_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_pod.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_pod,
+            "test",
+            namespace="ns"
+        )
+
+        self.client.delete_namespaced_pod.assert_called_once()
+        self.client.read_namespaced_pod.assert_called_once()
+
+    def test_delete_pod_and_wait_termination_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.delete_pod,
+            "test",
+            namespace="ns"
+        )
+
+        self.client.delete_namespaced_pod.assert_called_once()
+        self.assertEqual(2, self.client.read_namespaced_pod.call_count)
