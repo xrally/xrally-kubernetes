@@ -63,7 +63,7 @@ class KubernetesServiceTestCase(test.TestCase):
             "server": "stub_server",
             "certificate-authority": "stub_auth"
         }
-        return service.Kubernetes(spec)
+        return service.Kubernetes(spec, name_generator=mock.MagicMock())
 
     def test__init__kubernetes_version(self):
         from kubernetes import client as k8s_config
@@ -666,7 +666,7 @@ class KubernetesServiceTestCase(test.TestCase):
 
         read_resp = mock.MagicMock()
         read_resp.status.phase = "Pending"
-        self.client.read_namespace.return_value = read_resp
+        self.client.read_namespaced_pod.return_value = read_resp
 
         self.assertRaises(
             rally_exc.TimeoutException,
@@ -764,3 +764,348 @@ class KubernetesServiceTestCase(test.TestCase):
 
         self.client.delete_namespaced_pod.assert_called_once()
         self.assertEqual(2, self.client.read_namespaced_pod.call_count)
+
+    def test_create_replication_controller(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_rc(
+            "name",
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "ReplicationController",
+            "metadata": {
+                "name": "name",
+            },
+            "spec": {
+                "replicas": 2,
+                "selector": {
+                    "app": mock.ANY
+                },
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "name",
+                                "image": "test/image"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_replication_controller_with_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_rc(
+            "name",
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command=["ls"],
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "ReplicationController",
+            "metadata": {
+                "name": "name",
+            },
+            "spec": {
+                "replicas": 2,
+                "selector": {
+                    "app": mock.ANY
+                },
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "name",
+                                "image": "test/image",
+                                "command": ["ls"]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_replication_controller_with_incorrect_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_rc(
+            "name",
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command="ls",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "ReplicationController",
+            "metadata": {
+                "name": "name",
+            },
+            "spec": {
+                "replicas": 2,
+                "selector": {
+                    "app": mock.ANY
+                },
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "name",
+                                "image": "test/image"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_replication_controller_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        resp = mock.MagicMock()
+        resp.status.replicas = 2
+        resp.status.ready_replicas = 2
+        self.client.read_namespaced_replication_controller.return_value = resp
+
+        self.k8s_client.create_rc(
+            "name",
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once())
+        (self.client.read_namespaced_replication_controller
+            .assert_called_once_with(
+                "name",
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_replication_controller_fail_create(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespaced_replication_controller.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_rc,
+            "name",
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once())
+        self.assertEqual(
+            0,
+            self.client.read_namespaced_replication_controller.call_count
+        )
+
+    def test_create_and_wait_replication_controller_fail_read(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_replication_controller.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_rc,
+            "name",
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once())
+        (self.client.read_namespaced_replication_controller
+         .assert_called_once())
+
+    def test_create_and_wait_replication_controller_read_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        resp = mock.MagicMock()
+        resp.status.ready_replicas = None
+        self.client.read_namespaced_replication_controller.return_value = resp
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.create_rc,
+            "name",
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_replication_controller
+            .assert_called_once())
+        self.assertEqual(
+            2,
+            self.client.read_namespaced_replication_controller.call_count
+        )
+
+    def test_delete_replication_controller(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        from kubernetes import client as k8s_config
+
+        self.k8s_client.delete_rc("test", namespace="ns", status_wait=False)
+
+        (self.client.delete_namespaced_replication_controller
+            .assert_called_once_with(
+                "test",
+                body=k8s_config.V1DeleteOptions(),
+                namespace="ns"
+            ))
+
+    def test_delete_replication_controller_and_wait_termination_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_replication_controller.side_effect = [
+            rest.ApiException(status=404, reason="Not found")
+        ]
+
+        self.k8s_client.delete_rc("test", namespace="ns")
+
+        (self.client.delete_namespaced_replication_controller
+            .assert_called_once())
+        (self.client.read_namespaced_replication_controller
+            .assert_called_once_with("test", namespace="ns"))
+
+    def test_delete_replication_controller_delete_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespaced_replication_controller.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_rc,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_replication_controller
+            .assert_called_once())
+        self.assertEqual(
+            0,
+            self.client.read_namespaced_replication_controller.call_count
+        )
+
+    def test_delete_replication_controller_read_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_replication_controller.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_rc,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_replication_controller
+            .assert_called_once())
+        (self.client.read_namespaced_replication_controller
+            .assert_called_once_with("test", namespace="ns"))
+
+    def test_delete_replication_controller_and_wait_termination_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.delete_rc,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_replication_controller
+            .assert_called_once())
+        self.assertEqual(
+            2,
+            self.client.read_namespaced_replication_controller.call_count
+        )

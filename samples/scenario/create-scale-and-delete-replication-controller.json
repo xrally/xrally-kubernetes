@@ -1,0 +1,50 @@
+{
+  "version": 2,
+  "title": "Create, scale and delete replication controller with random name",
+  "subtasks": [
+    {
+      "title": "Run a single workload with create/scale/delete replication controller",
+      "scenario": {
+        "Kubernetes.create_scale_and_delete_replication_controller": {
+          "image": "kubernetes/pause",
+          "replicas": 2,
+          "scale_replicas": 3
+        }
+      },
+      "runner": {
+        "constant": {
+          "concurrency": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    },
+    {
+      "title": "Run create/scale/delete replication controller with rps runner",
+      "scenario": {
+        "Kubernetes.create_scale_and_delete_replication_controller": {
+          "image": "kubernetes/pause",
+          "replicas": 2,
+          "scale_replicas": 3
+        }
+      },
+      "runner": {
+        "rps": {
+          "rps": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    }
+  ]
+}
