@@ -12,12 +12,14 @@
 # under the License.
 
 import os
+import re
 
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
 from kubernetes.client.apis import core_v1_api
 from kubernetes.client.apis import version_api
 from kubernetes.client import rest
+from kubernetes.stream import stream
 from rally.common import cfg
 from rally.common import logging
 from rally.common import utils as commonutils
@@ -272,22 +274,35 @@ class Kubernetes(service.Service):
                                                 body=secret_manifest)
 
     @atomic.action_timer("kubernetes.get_pod")
-    def get_pod(self, name, namespace):
+    def get_pod(self, name, namespace, **kwargs):
         """Get pod status.
 
         :param name: pod's name
         :param namespace: pod's namespace
         """
+        if kwargs.get("volume"):
+            e_list = self.v1_client.list_namespaced_event(namespace=namespace)
+            for item in e_list.items:
+                if item.metadata.name.startswith(name):
+                    if item.reason == "CreateContainerError":
+                        raise exceptions.RallyException(
+                            message="Volume mount failed with %(reason)s and "
+                                    "message: %(msg)s" % {
+                                        "reason": item.reason,
+                                        "msg": item.message
+                                    })
         return self.v1_client.read_namespaced_pod(name, namespace=namespace)
 
     @atomic.action_timer("kubernetes.create_pod")
-    def create_pod(self, name, image, namespace, command=None,
+    def create_pod(self, name, image, namespace, command=None, volume=None,
                    status_wait=True):
         """Create pod and wait until status phase won't be Running.
 
         :param name: pod's custom name
         :param image: pod's image
         :param namespace: chosen namespace to create pod into
+        :param volume: a dict, which contains `mount_path` and `volume` keys
+               with parts of pod's manifest as values
         :param command: array of strings which represents container command
         :param status_wait: wait pod for Running status
         """
@@ -299,6 +314,8 @@ class Kubernetes(service.Service):
         }
         if command is not None and isinstance(command, (list, tuple)):
             container_spec["command"] = list(command)
+        if volume and volume.get("mount_path"):
+            container_spec["volumeMounts"] = volume["mount_path"]
 
         manifest = {
             "apiVersion": "v1",
@@ -317,6 +334,8 @@ class Kubernetes(service.Service):
 
         if not self._spec.get("serviceaccounts"):
             del manifest["spec"]["serviceAccountName"]
+        if volume and volume.get("volume"):
+            manifest["spec"]["volumes"] = volume["volume"]
 
         self.v1_client.create_namespaced_pod(body=manifest,
                                              namespace=namespace)
@@ -327,8 +346,32 @@ class Kubernetes(service.Service):
                 wait_for_status(name,
                                 status="Running",
                                 read_method=self.get_pod,
-                                namespace=namespace)
+                                namespace=namespace,
+                                volume=volume)
         return name
+
+    @atomic.action_timer("kube.check_volume_pod_existence")
+    def check_volume_pod(self, name, namespace, check_cmd, error_regexp=None):
+        """Exec check_cmd in pod and get response.
+
+        :param name: pod's name
+        :param namespace: pod's namespace
+        :param check_cmd: check_cmd as array of strings
+        :param error_regexp: error regexp to raise exception
+        """
+        resp = stream(
+            self.v1_client.connect_get_namespaced_pod_exec,
+            name,
+            namespace=namespace,
+            command=check_cmd,
+            stderr=True, stdin=False,
+            stdout=True, tty=False)
+
+        regexp = re.search(error_regexp, resp)
+        if "exec failed" in resp or (error_regexp and regexp is not None):
+            raise exceptions.RallyException(
+                message="Check pod's volume exec failed with error: %s" % resp
+            )
 
     @atomic.action_timer("kubernetes.delete_pod")
     def delete_pod(self, name, namespace, status_wait=True):
