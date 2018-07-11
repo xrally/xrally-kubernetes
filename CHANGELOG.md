@@ -26,6 +26,8 @@
 * [scenario plugin] Kubernetes.create_and_delete_pod
 * [scenario plugin] Kubernetes.create_and_delete_replication_controller
 * [scenario plugin] Kubernetes.create_scale_and_delete_replication_controller
+* [scenario plugin] Kubernetes.create_and_delete_replicaset
+* [scenario plugin] Kubernetes.create_scale_and_delete_replicaset
 
 ## [1.0.0] - 2018-06-26
 

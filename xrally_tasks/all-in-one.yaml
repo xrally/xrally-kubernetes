@@ -60,3 +60,32 @@ subtasks:
     namespaces:
       count: 3
       with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete replicaset
+  scenario:
+    Kubernetes.create_and_delete_replicaset:
+      image: kubernetes/pause
+      replicas: 1
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/scale/delete replicaset
+  scenario:
+    Kubernetes.create_scale_and_delete_replicaset:
+      image: kubernetes/pause
+      replicas: 1
+      scale_replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true

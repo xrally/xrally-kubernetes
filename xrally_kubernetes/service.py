@@ -16,6 +16,7 @@ import os
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
 from kubernetes.client.apis import core_v1_api
+from kubernetes.client.apis import extensions_v1beta1_api
 from kubernetes.client.apis import version_api
 from kubernetes.client import rest
 from rally.common import cfg
@@ -190,6 +191,7 @@ class Kubernetes(service.Service):
 
         self.api = api
         self.v1_client = core_v1_api.CoreV1Api(api)
+        self.v1beta1_ext = extensions_v1beta1_api.ExtensionsV1beta1Api(api)
 
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
@@ -517,3 +519,123 @@ class Kubernetes(service.Service):
                     read_method=self.get_rc,
                     resource_type="Replication controller",
                     namespace=namespace)
+
+    @atomic.action_timer("kubernetes.get_replicaset")
+    def get_replicaset(self, name, namespace, **kwargs):
+        return self.v1beta1_ext.read_namespaced_replica_set(
+            name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_replicaset")
+    def create_replicaset(self, name, namespace, replicas, image,
+                          command=None, status_wait=True):
+        """Create replicaset and wait until it won't be ready.
+
+        :param name: replicaset name
+        :param namespace: replicaset namespace
+        :param replicas: number of replicaset replicas
+        :param image: container's template image
+        :param command: container's template array of strings command
+        :param status_wait: wait for readiness if True
+        """
+        app = self.generate_random_name()
+        name = name or self.generate_random_name()
+
+        container_spec = {
+            "name": name,
+            "image": image
+        }
+        if command is not None and isinstance(command, (list, tuple)):
+            container_spec["command"] = list(command)
+
+        manifest = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "ReplicaSet",
+            "metadata": {
+                "name": name,
+                "labels": {
+                    "app": app
+                }
+            },
+            "spec": {
+                "replicas": replicas,
+                "selector": {
+                    "matchLabels": {
+                        "app": app
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "name": name,
+                        "labels": {
+                            "app": app
+                        }
+                    },
+                    "spec": {
+                        "serviceAccountName": namespace,
+                        "containers": [container_spec]
+                    }
+                }
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["template"]["spec"]["serviceAccountName"]
+
+        self.v1beta1_ext.create_namespaced_replica_set(
+            namespace=namespace,
+            body=manifest
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_replicaset_become_ready"):
+                wait_for_ready_replicas(
+                    name,
+                    read_method=self.get_replicaset,
+                    resource_type="ReplicaSet",
+                    replicas=replicas,
+                    namespace=namespace)
+        return name
+
+    @atomic.action_timer("kubernetes.scale_replicaset")
+    def scale_replicaset(self, name, namespace, replicas, status_wait=True):
+        self.v1beta1_ext.patch_namespaced_replica_set(
+            name,
+            namespace=namespace,
+            body={"spec": {"replicas": replicas}}
+        )
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_replicaset_scale"):
+                wait_for_ready_replicas(
+                    name,
+                    read_method=self.get_replicaset,
+                    replicas=replicas,
+                    resource_type="ReplicaSet",
+                    namespace=namespace)
+
+    @atomic.action_timer("kubernetes.delete_replicaset")
+    def delete_replicaset(self, name, namespace, status_wait=True):
+        """Delete replicaset and optionally wait for termination
+
+        :param name: replicaset name
+        :param namespace: replicaset namespace
+        :param status_wait: wait for termination if True
+        """
+        self.v1beta1_ext.delete_namespaced_replica_set(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_replicaset_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_replicaset,
+                                   namespace=namespace,
+                                   resource_type="ReplicaSet",
+                                   replicas=True)
