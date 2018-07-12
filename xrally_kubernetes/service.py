@@ -94,7 +94,7 @@ def wait_for_ready_replicas(name, read_method, resource_type=None,
             return
         if i == retries_total:
             raise exceptions.TimeoutException(
-                desired_status="%s replicas running" % ready_replicas,
+                desired_status="%s replicas running" % replicas,
                 resource_name=name,
                 resource_type=resource_type,
                 resource_id=resp_id or "<no id>",
@@ -257,6 +257,7 @@ class Kubernetes(service.Service):
             with atomic.ActionTimer(self,
                                     "kubernetes.wait_for_nc_become_active"):
                 wait_for_status(name,
+                                resource_type="Namespace",
                                 status="Active",
                                 read_method=self.get_namespace)
         return name
@@ -275,6 +276,7 @@ class Kubernetes(service.Service):
             with atomic.ActionTimer(self,
                                     "kubernetes.wait_namespace_termination"):
                 wait_for_not_found(name,
+                                   resource_type="Namespace",
                                    read_method=self.get_namespace)
 
     @atomic.action_timer("kubernetes.create_serviceaccount")
@@ -370,6 +372,7 @@ class Kubernetes(service.Service):
                 wait_for_status(name,
                                 status="Running",
                                 read_method=self.get_pod,
+                                resource_type="Pod",
                                 namespace=namespace)
         return name
 
@@ -392,6 +395,7 @@ class Kubernetes(service.Service):
                                     "kubernetes.wait_pod_termination"):
                 wait_for_not_found(name,
                                    read_method=self.get_pod,
+                                   resource_type="Pod",
                                    namespace=namespace)
 
     @atomic.action_timer("kubernetes.get_replication_controller")
