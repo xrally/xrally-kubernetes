@@ -66,14 +66,12 @@ def wait_for_status(name, status, read_method, resource_type=None, **kwargs):
                 timeout=(retries_total * sleep_time))
 
 
-def wait_for_ready_replicas(name, read_method, resource_type=None,
-                            replicas=None, **kwargs):
+def wait_for_ready_replicas(name, read_method, resource_type=None, **kwargs):
     """Util method for polling status until it won't be all replicas running.
 
     :param name: resource name
     :param read_method: method to poll
     :param resource_type: resource type for extended exceptions
-    :param replicas: expected replicas for extended exceptions
     :param kwargs: additional kwargs for read_method
     """
     sleep_time = CONF.kubernetes.status_poll_interval
@@ -96,7 +94,7 @@ def wait_for_ready_replicas(name, read_method, resource_type=None,
             return
         if i == retries_total:
             raise exceptions.TimeoutException(
-                desired_status="%s replicas running" % replicas,
+                desired_status="%s replicas running" % ready_replicas,
                 resource_name=name,
                 resource_type=resource_type,
                 resource_id=resp_id or "<no id>",
@@ -527,7 +525,6 @@ class Kubernetes(service.Service):
                     name,
                     read_method=self.get_rc,
                     resource_type="Replication controller",
-                    replicas=replicas,
                     namespace=namespace)
         return name
 
@@ -554,7 +551,6 @@ class Kubernetes(service.Service):
                     name,
                     read_method=self.get_rc,
                     resource_type="Replication controller",
-                    replicas=replicas,
                     namespace=namespace)
 
     @atomic.action_timer("kubernetes.delete_replication_controller")
@@ -655,7 +651,6 @@ class Kubernetes(service.Service):
                     name,
                     read_method=self.get_replicaset,
                     resource_type="ReplicaSet",
-                    replicas=replicas,
                     namespace=namespace)
         return name
 
@@ -673,7 +668,6 @@ class Kubernetes(service.Service):
                 wait_for_ready_replicas(
                     name,
                     read_method=self.get_replicaset,
-                    replicas=replicas,
                     resource_type="ReplicaSet",
                     namespace=namespace)
 
@@ -697,4 +691,148 @@ class Kubernetes(service.Service):
                                    read_method=self.get_replicaset,
                                    namespace=namespace,
                                    resource_type="ReplicaSet",
+                                   replicas=True)
+
+    @atomic.action_timer("kubernetes.get_deployment")
+    def get_deployment(self, name, namespace, **kwargs):
+        return self.v1beta1_ext.read_namespaced_deployment_status(
+            name=name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_deployment")
+    def create_deployment(self, namespace, replicas, image, resources=None,
+                          env=None, command=None, status_wait=True):
+        """Create deployment and wait until it won't be ready.
+
+        :param namespace: deployment namespace
+        :param replicas: number of deployment replicas
+        :param image: container's template image
+        :param resources: container's template resources requirements
+        :param env: container's template env variables array
+        :param command: container's template array of strings command
+        :param status_wait: wait for readiness if True
+        """
+        app = self.generate_random_name()
+        name = self.generate_random_name()
+
+        container_spec = {
+            "name": name,
+            "image": image
+        }
+        if command is not None and isinstance(command, (list, tuple)):
+            container_spec["command"] = list(command)
+        if env is not None and isinstance(env, (list, tuple)):
+            container_spec["env"] = list(env)
+        if resources is not None and isinstance(resources, dict):
+            container_spec["resources"] = resources
+
+        manifest = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": name,
+                "labels": {
+                    "app": app
+                }
+            },
+            "spec": {
+                "replicas": replicas,
+                "template": {
+                    "metadata": {
+                        "name": name,
+                        "labels": {
+                            "app": app
+                        }
+                    },
+                    "spec": {
+                        "serviceAccountName": namespace,
+                        "containers": [container_spec]
+                    }
+                }
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["template"]["spec"]["serviceAccountName"]
+
+        self.v1beta1_ext.create_namespaced_deployment(
+            namespace=namespace,
+            body=manifest
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_deployment_become_ready"):
+                wait_for_ready_replicas(
+                    name,
+                    read_method=self.get_deployment,
+                    resource_type="Deployment",
+                    namespace=namespace)
+        return name
+
+    @atomic.action_timer("kubernetes.rollout_deployment")
+    def rollout_deployment(self, name, namespace, changes, replicas,
+                           status_wait=True):
+        """Patch deployment and optionally wait for status.
+
+        :param name: deployment name
+        :param namespace: deployment namespace
+        :param changes: map of changes, where could be image, env or resources
+               requirements
+        :param replicas: deployment replicas for status
+        :param status_wait: wait for status if True
+        """
+        deployment = self.get_deployment(name, namespace=namespace)
+        if changes.get("image"):
+            deployment.spec.template.spec.containers[0].image = (
+                changes.get("image"))
+        elif changes.get("env"):
+            deployment.spec.template.spec.containers[0].env = (
+                changes.get("env"))
+        elif changes.get("resources"):
+            deployment.spec.template.spec.containers[0].resources = (
+                changes.get("resources"))
+        else:
+            raise exceptions.InvalidArgumentsException(
+                message="'changes' argument is a map with allowed mutually "
+                        "exclusive keys: image, env, resources."
+            )
+
+        self.v1beta1_ext.patch_namespaced_deployment(
+            name=name,
+            namespace=namespace,
+            body=deployment
+        )
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_deployment_rollout"):
+                wait_for_ready_replicas(
+                    name,
+                    read_method=self.get_deployment,
+                    resource_type="Deployment",
+                    namespace=namespace)
+
+    @atomic.action_timer("kubernetes.delete_deployment")
+    def delete_deployment(self, name, namespace, status_wait=True):
+        """Delete deployment and optionally wait for termination
+
+        :param name: deployment name
+        :param namespace: deployment namespace
+        :param status_wait: wait for termination if True
+        """
+        self.v1beta1_ext.delete_namespaced_deployment(
+            name=name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_deployment_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_deployment,
+                                   namespace=namespace,
+                                   resource_type="Deployment",
                                    replicas=True)

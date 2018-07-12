@@ -201,3 +201,41 @@ subtasks:
     namespaces:
       count: 3
       with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete deployment
+  scenario:
+    Kubernetes.create_and_delete_deployment:
+      image: kubernetes/pause
+      replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/rollout/delete deployment
+  scenario:
+    Kubernetes.create_rollout_and_delete_deployment:
+      image: busybox
+      replicas: 1
+      command:
+      - sleep
+      - "3600"
+      env:
+      - name: "UPD"
+        value: "false"
+      changes:
+        env:
+        - name: "UPD"
+          value: "true"
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true

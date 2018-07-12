@@ -42,8 +42,8 @@ class MapKeysParameterValidator(validation.Validator):
            keys are specified, defaults to False, otherwise defaults to True
     :param missed: Allow to accept optional parameter
     """
-    def __init__(self, param_name, required, allowed=None, additional=True,
-                 missed=False):
+    def __init__(self, param_name, required=None, allowed=None,
+                 additional=True, missed=False):
         super(MapKeysParameterValidator, self).__init__()
         self.param_name = param_name
         self.required = required or []

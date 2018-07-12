@@ -1834,3 +1834,364 @@ class PodWithVolumeTestCase(KubernetesServiceTestCase):
             body=expected,
             namespace="ns"
         )
+
+
+class DeploymentServiceTestCase(KubernetesServiceTestCase):
+
+    def setUp(self):
+        super(DeploymentServiceTestCase, self).setUp()
+
+        from kubernetes.client.apis import extensions_v1beta1_api
+
+        p_mock_client = mock.patch.object(extensions_v1beta1_api,
+                                          "ExtensionsV1beta1Api")
+        self.client_cls = p_mock_client.start()
+        self.client = self.client_cls.return_value
+        self.addCleanup(p_mock_client.stop)
+
+    def test_create_deployment(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_deployment(
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "app": mock.ANY
+                }
+            },
+            "spec": {
+                "replicas": 2,
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "name",
+                                "image": "test/image"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_deployment
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_deployment_with_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_deployment(
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command=["ls"],
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "app": mock.ANY
+                }
+            },
+            "spec": {
+                "replicas": 2,
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "name",
+                                "image": "test/image",
+                                "command": ["ls"]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_deployment
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_deployment_with_incorrect_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_deployment(
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command="ls",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "app": mock.ANY
+                }
+            },
+            "spec": {
+                "replicas": 2,
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": "name",
+                                "image": "test/image"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_deployment
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_deployment_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        resp = mock.MagicMock()
+        resp.status.replicas = 2
+        resp.status.ready_replicas = 2
+        self.client.read_namespaced_deployment_status.return_value = resp
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_deployment(
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_deployment
+            .assert_called_once())
+        (self.client.read_namespaced_deployment_status
+            .assert_called_once_with(
+                name="name",
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_deployment_fail_create(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespaced_deployment.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_deployment,
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_deployment
+            .assert_called_once())
+        self.assertEqual(
+            0,
+            self.client.read_namespaced_deployment_status.call_count
+        )
+
+    def test_create_and_wait_deployment_fail_read(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_deployment_status.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_deployment,
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_deployment
+            .assert_called_once())
+        (self.client.read_namespaced_deployment_status
+         .assert_called_once())
+
+    def test_create_and_wait_deployment_read_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        resp = mock.MagicMock()
+        resp.status.ready_replicas = None
+        self.client.read_namespaced_deployment_status.return_value = resp
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.create_deployment,
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_deployment
+            .assert_called_once())
+        self.assertEqual(
+            2,
+            self.client.read_namespaced_deployment_status.call_count
+        )
+
+    def test_delete_deployment(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        from kubernetes import client as k8s_config
+
+        self.k8s_client.delete_deployment("test", namespace="ns",
+                                          status_wait=False)
+
+        (self.client.delete_namespaced_deployment
+            .assert_called_once_with(
+                name="test",
+                body=k8s_config.V1DeleteOptions(),
+                namespace="ns"
+            ))
+
+    def test_delete_deployment_and_wait_termination_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_deployment_status.side_effect = [
+            rest.ApiException(status=404, reason="Not found")
+        ]
+
+        self.k8s_client.delete_deployment("test", namespace="ns")
+
+        (self.client.delete_namespaced_deployment
+            .assert_called_once())
+        (self.client.read_namespaced_deployment_status
+            .assert_called_once_with(name="test", namespace="ns"))
+
+    def test_delete_deployment_delete_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespaced_deployment.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_deployment,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_deployment
+            .assert_called_once())
+        self.assertEqual(
+            0,
+            self.client.read_namespaced_deployment_status.call_count
+        )
+
+    def test_delete_deployment_read_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_deployment_status.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_deployment,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_deployment
+            .assert_called_once())
+        (self.client.read_namespaced_deployment_status
+            .assert_called_once_with(name="test", namespace="ns"))
+
+    def test_delete_deployment_and_wait_termination_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.delete_deployment,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_deployment
+            .assert_called_once())
+        self.assertEqual(
+            2,
+            self.client.read_namespaced_deployment_status.call_count
+        )
