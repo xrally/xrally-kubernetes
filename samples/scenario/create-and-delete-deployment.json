@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "title": "Create, read and delete deployment with random name",
+  "subtasks": [
+    {
+      "title": "Run a single workload with create/read/delete deployment",
+      "scenario": {
+        "Kubernetes.create_and_delete_deployment": {
+          "image": "kubernetes/pause",
+          "replicas": 2
+        }
+      },
+      "runner": {
+        "constant": {
+          "concurrency": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    },
+    {
+      "title": "Run create/read/delete deployment with rps runner",
+      "scenario": {
+        "Kubernetes.create_and_delete_deployment": {
+          "image": "kubernetes/pause",
+          "replicas": 2
+        }
+      },
+      "runner": {
+        "rps": {
+          "rps": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    }
+  ]
+}
