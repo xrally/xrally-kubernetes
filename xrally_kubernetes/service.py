@@ -65,6 +65,44 @@ def wait_for_status(name, status, read_method, resource_type=None, **kwargs):
                 timeout=(retries_total * sleep_time))
 
 
+def wait_for_ready_replicas(name, read_method, resource_type=None,
+                            replicas=None, **kwargs):
+    """Util method for polling status until it won't be all replicas running.
+
+    :param name: resource name
+    :param read_method: method to poll
+    :param resource_type: resource type for extended exceptions
+    :param replicas: expected replicas for extended exceptions
+    :param kwargs: additional kwargs for read_method
+    """
+    sleep_time = CONF.kubernetes.status_poll_interval
+    retries_total = CONF.kubernetes.status_total_retries
+
+    commonutils.interruptable_sleep(CONF.kubernetes.start_prepoll_delay)
+
+    i = 0
+    while i < retries_total:
+        resp = read_method(name=name, **kwargs)
+        resp_id = resp.metadata.uid
+        current_replicas = resp.status.replicas
+        ready_replicas = resp.status.ready_replicas
+        if (current_replicas is None or
+                ready_replicas is None or
+                current_replicas != ready_replicas):
+            i += 1
+            commonutils.interruptable_sleep(sleep_time)
+        else:
+            return
+        if i == retries_total:
+            raise exceptions.TimeoutException(
+                desired_status="%s replicas running" % replicas,
+                resource_name=name,
+                resource_type=resource_type,
+                resource_id=resp_id or "<no id>",
+                resource_status="%s replicas running" % current_replicas,
+                timeout=(retries_total * sleep_time))
+
+
 def wait_for_not_found(name, read_method, resource_type=None, **kwargs):
     """Util method for polling status while resource exists.
 
@@ -83,7 +121,10 @@ def wait_for_not_found(name, read_method, resource_type=None, **kwargs):
         try:
             resp = read_method(name=name, **kwargs)
             resp_id = resp.metadata.uid
-            current_status = resp.status.phase
+            if hasattr(resp.status, "phase"):
+                current_status = resp.status.phase
+            else:
+                current_status = "Unknown"
         except rest.ApiException as ex:
             if ex.status == 404:
                 return
@@ -216,6 +257,7 @@ class Kubernetes(service.Service):
             with atomic.ActionTimer(self,
                                     "kubernetes.wait_for_nc_become_active"):
                 wait_for_status(name,
+                                resource_type="Namespace",
                                 status="Active",
                                 read_method=self.get_namespace)
         return name
@@ -234,6 +276,7 @@ class Kubernetes(service.Service):
             with atomic.ActionTimer(self,
                                     "kubernetes.wait_namespace_termination"):
                 wait_for_not_found(name,
+                                   resource_type="Namespace",
                                    read_method=self.get_namespace)
 
     @atomic.action_timer("kubernetes.create_serviceaccount")
@@ -323,7 +366,7 @@ class Kubernetes(service.Service):
             "metadata": {
                 "name": name,
                 "labels": {
-                    "role": self._spec.get("env_id") or name
+                    "role": name
                 }
             },
             "spec": {
@@ -346,6 +389,7 @@ class Kubernetes(service.Service):
                 wait_for_status(name,
                                 status="Running",
                                 read_method=self.get_pod,
+                                resource_type="Pod",
                                 namespace=namespace,
                                 volume=volume)
         return name
@@ -392,4 +436,131 @@ class Kubernetes(service.Service):
                                     "kubernetes.wait_pod_termination"):
                 wait_for_not_found(name,
                                    read_method=self.get_pod,
+                                   resource_type="Pod",
                                    namespace=namespace)
+
+    @atomic.action_timer("kubernetes.get_replication_controller")
+    def get_rc(self, name, namespace):
+        return self.v1_client.read_namespaced_replication_controller(
+            name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_replication_controller")
+    def create_rc(self, name, replicas, image, namespace, command=None,
+                  status_wait=True):
+        """Create RC and wait until it won't be running.
+
+        :param name: replication controller name
+        :param replicas: number of replicas
+        :param image: image for each replica
+        :param namespace: replication controller namespace
+        :param command: array of strings representing container command
+        :param status_wait: wait replication controller for actual running
+               replicas
+        """
+        name = name or self.generate_random_name()
+        app = self.generate_random_name()
+
+        container_spec = {
+            "name": name,
+            "image": image
+        }
+        if command is not None and isinstance(command, (list, tuple)):
+            container_spec["command"] = list(command)
+
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "ReplicationController",
+            "metadata": {
+                "name": name,
+            },
+            "spec": {
+                "replicas": replicas,
+                "selector": {
+                    "app": app
+                },
+                "template": {
+                    "metadata": {
+                        "name": name,
+                        "labels": {
+                            "app": app
+                        }
+                    },
+                    "spec": {
+                        "serviceAccountName": namespace,
+                        "containers": [container_spec]
+                    }
+                }
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["template"]["spec"]["serviceAccountName"]
+
+        self.v1_client.create_namespaced_replication_controller(
+            body=manifest,
+            namespace=namespace
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_replication_controller_ready_replicas"
+            ):
+                wait_for_ready_replicas(
+                    name,
+                    read_method=self.get_rc,
+                    resource_type="Replication controller",
+                    replicas=replicas,
+                    namespace=namespace)
+        return name
+
+    @atomic.action_timer("kubernetes.scale_replication_controller")
+    def scale_rc(self, name, namespace, replicas, status_wait=True):
+        """Scale replication controller with number of replicas.
+
+        :param name: replication controller name
+        :param namespace: replication controller namespace
+        :param replicas: number of replicas replication controller scale to
+        :returns True if scale successful and False otherwise
+        """
+        self.v1_client.patch_namespaced_replication_controller(
+            name=name,
+            namespace=namespace,
+            body={"spec": {"replicas": replicas}}
+        )
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_replication_controller_ready_replicas"
+            ):
+                wait_for_ready_replicas(
+                    name,
+                    read_method=self.get_rc,
+                    resource_type="Replication controller",
+                    replicas=replicas,
+                    namespace=namespace)
+
+    @atomic.action_timer("kubernetes.delete_replication_controller")
+    def delete_rc(self, name, namespace, status_wait=True):
+        """Delete replication controller and optionally wait for termination.
+
+        :param name: replication controller name
+        :param namespace: replication controller namespace
+        :param status_wait: wait replication controller for termination
+        """
+        self.v1_client.delete_namespaced_replication_controller(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_replication_controller_termination"):
+                wait_for_not_found(
+                    name,
+                    read_method=self.get_rc,
+                    resource_type="Replication controller",
+                    namespace=namespace)
