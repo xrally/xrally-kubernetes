@@ -21,6 +21,8 @@
 
 **Added**
 
+* [scenario plugin] Kubernetes.create_and_delete_emptydir_volume
+* [scenario plugin] Kubernetes.create_check_and_delete_emptydir_volume
 * [context plugin] namespaces - create number of namespaces (with
   non-default serviceAccounts optionally)
 * [scenario plugin] Kubernetes.create_and_delete_pod
