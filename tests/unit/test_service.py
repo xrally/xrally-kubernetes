@@ -1487,3 +1487,195 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
             2,
             self.client.read_namespaced_replica_set.call_count
         )
+
+
+class PodWithEmptyDirVolumeTestCase(KubernetesServiceTestCase):
+
+    def test_create_pod_with_volume_and_wait_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Running"
+        self.client.read_namespaced_pod.return_value = read_resp
+
+        event_resp = mock.MagicMock()
+        event_resp.items = []
+        self.client.list_namespaced_event.return_value = event_resp
+
+        self.k8s_client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            volume={
+                "mount_path": ["stub"],
+                "volume": ["stub"]
+            },
+            status_wait=True
+        )
+
+        self.client.create_namespaced_pod.assert_called_once()
+        self.client.read_namespaced_pod.assert_called_once_with(
+            "name",
+            namespace="ns"
+        )
+        self.client.list_namespaced_event.assert_called_once_with(
+            namespace="ns"
+        )
+
+    def test_create_pod_with_volume_and_wait_create_container_error(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Running"
+        self.client.read_namespaced_pod.return_value = read_resp
+
+        event_resp = mock.MagicMock()
+        event = mock.MagicMock()
+        event.name = "name"
+        event.reason = "CreateContainerError"
+        event.message = "Test raise"
+        event_resp.items = [event]
+        self.client.list_namespaced_event.return_value = event_resp
+
+        self.assertRaises(
+            rally_exc.RallyException,
+            self.k8s_client.create_pod,
+            "name",
+            image="test/image",
+            namespace="ns",
+            volume={
+                "mount_path": ["stub"],
+                "volume": ["stub"]
+            },
+            status_wait=True
+        )
+
+        self.client.create_namespaced_pod.assert_called_once()
+        self.assertEqual(0, self.client.read_namespaced_pod.call_count)
+        self.client.list_namespaced_event.assert_called_once_with(
+            namespace="ns"
+        )
+
+    def test_check_volume_pod_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        api = mock.MagicMock()
+        api.api_client.request = mock.MagicMock()
+        self.client.connect_get_namespaced_pod_exec.__self__ = mock.MagicMock()
+        self.client.connect_get_namespaced_pod_exec.__self__.return_value = api
+        self.client.connect_get_namespaced_pod_exec.return_value = (
+            "for success")
+
+        self.assertIsNone(self.k8s_client.check_volume_pod(
+            "name",
+            namespace="ns",
+            check_cmd="check",
+            error_regexp="nope"
+        ))
+
+    def test_check_volume_pod_exec_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        api = mock.MagicMock()
+        api.api_client.request = mock.MagicMock()
+        self.client.connect_get_namespaced_pod_exec.__self__ = mock.MagicMock()
+        self.client.connect_get_namespaced_pod_exec.__self__.return_value = api
+        self.client.connect_get_namespaced_pod_exec.return_value = (
+            "exec failed: command not found")
+
+        self.assertRaises(
+            rally_exc.RallyException,
+            self.k8s_client.check_volume_pod,
+            "name",
+            namespace="ns",
+            check_cmd="check",
+            error_regexp="nope"
+        )
+
+    def test_check_volume_pod_exec_error_regexp(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        api = mock.MagicMock()
+        api.api_client.request = mock.MagicMock()
+        self.client.connect_get_namespaced_pod_exec.__self__ = mock.MagicMock()
+        self.client.connect_get_namespaced_pod_exec.__self__.return_value = api
+        self.client.connect_get_namespaced_pod_exec.return_value = (
+            "nope, error response")
+
+        self.assertRaises(
+            rally_exc.RallyException,
+            self.k8s_client.check_volume_pod,
+            "name",
+            namespace="ns",
+            check_cmd="check",
+            error_regexp="nope"
+        )
+
+    def test_create_pod_emptydir_volume(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_pod(
+            "name",
+            image="test/image",
+            namespace="ns",
+            volume={
+                "mount_path": [
+                    {
+                        "name": "stub",
+                        "mountPath": "/check"
+                    }
+                ],
+                "volume": [
+                    {
+                        "name": "stub",
+                        "emptyDir": {}
+                    }
+                ]
+            },
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/check",
+                                "name": "stub"
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "stub",
+                        "emptyDir": {}
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
