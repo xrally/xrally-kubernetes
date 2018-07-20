@@ -26,7 +26,7 @@ class CreateAndDeleteReplicaSet(common_scenario.BaseKubernetesScenario):
     of replicas, wait until it won't be running and delete it after.
     """
 
-    def run(self, image, replicas, name=None, command=None, status_wait=True):
+    def run(self, image, replicas, command=None, status_wait=True):
         """Create and delete replicaset and wait for status optionally.
 
         :param image: container's template image
@@ -38,7 +38,6 @@ class CreateAndDeleteReplicaSet(common_scenario.BaseKubernetesScenario):
         namespace = self.choose_namespace()
 
         name = self.client.create_replicaset(
-            name,
             replicas=replicas,
             image=image,
             namespace=namespace,
@@ -62,21 +61,19 @@ class CreateScaleAndDeleteReplicaSet(common_scenario.BaseKubernetesScenario):
     scale it with original number of replicas, delete replicaset.
     """
 
-    def run(self, image, replicas, scale_replicas, name=None, command=None,
+    def run(self, image, replicas, scale_replicas, command=None,
             status_wait=True):
         """Create replicaset, scale for number of replicas and then delete it.
 
         :param image: replicaset pod template image
         :param replicas: original number of replicas
         :param scale_replicas: number of replicas to scale
-        :param name: custom replicaset name
         :param command: array of strings representing container command
         :param status_wait: wait for full status if True
         """
         namespace = self.choose_namespace()
 
         name = self.client.create_replicaset(
-            name,
             namespace=namespace,
             replicas=replicas,
             image=image,

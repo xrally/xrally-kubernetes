@@ -26,18 +26,16 @@ class RCCreateAndDelete(common_scenario.BaseKubernetesScenario):
     and number of replicas, wait until it won't be running and delete it after.
     """
 
-    def run(self, image, replicas, name=None, command=None, status_wait=True):
+    def run(self, image, replicas, command=None, status_wait=True):
         """Create and delete replication controller.
 
         :param replicas: number of replicas for replication controller
         :param image: replication controller image
-        :param name: replication controller custom name
         :param command: array of strings representing container command
         :param status_wait: wait replication controller status
         """
         namespace = self.choose_namespace()
         name = self.client.create_rc(
-            name,
             replicas=replicas,
             image=image,
             namespace=namespace,
@@ -63,21 +61,19 @@ class CreateScaleAndDeleteRCPlugin(common_scenario.BaseKubernetesScenario):
     scale it with original number of replicas, delete replication controller.
     """
 
-    def run(self, image, replicas, scale_replicas, name=None, command=None,
+    def run(self, image, replicas, scale_replicas, command=None,
             status_wait=True):
         """Create RC, scale with replicas, revert scale and then delete it.
 
         :param image: RC pod template image
         :param replicas: original number of replicas
         :param scale_replicas: number of replicas to scale
-        :param name: replication controller custom name
         :param command: array of strings representing container command
         :param status_wait: wait replication controller status
         """
         namespace = self.choose_namespace()
 
         name = self.client.create_rc(
-            name,
             namespace=namespace,
             replicas=replicas,
             image=image,

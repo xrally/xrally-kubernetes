@@ -41,7 +41,6 @@ class CreateAndDeleteReplicationControllerTestCase(test.TestCase):
         self.scenario.run("test/image", 2, command=["ls"])
 
         self.client.create_rc.assert_called_once_with(
-            None,
             namespace="ns",
             image="test/image",
             replicas=2,
@@ -62,7 +61,6 @@ class CreateAndDeleteReplicationControllerTestCase(test.TestCase):
         self.assertRaises(rest.ApiException, self.scenario.run,
                           "test/image", 2)
         self.client.create_rc.assert_called_once_with(
-            None,
             namespace="ns",
             image="test/image",
             replicas=2,
@@ -80,7 +78,6 @@ class CreateAndDeleteReplicationControllerTestCase(test.TestCase):
         self.assertRaises(rest.ApiException, self.scenario.run,
                           "test/image", 2)
         self.client.create_rc.assert_called_once_with(
-            None,
             command=None,
             namespace="ns",
             replicas=2,
@@ -110,7 +107,6 @@ class CreateScaleAndDeleteReplicationControllerTestCase(test.TestCase):
         self.scenario.run("test/image", 2, 3, command=["ls"])
 
         self.client.create_rc.assert_called_once_with(
-            None,
             namespace="ns",
             image="test/image",
             replicas=2,
@@ -132,7 +128,6 @@ class CreateScaleAndDeleteReplicationControllerTestCase(test.TestCase):
         self.assertRaises(rest.ApiException, self.scenario.run,
                           "test/image", 2, 3)
         self.client.create_rc.assert_called_once_with(
-            None,
             namespace="ns",
             image="test/image",
             replicas=2,
@@ -151,7 +146,6 @@ class CreateScaleAndDeleteReplicationControllerTestCase(test.TestCase):
         self.assertRaises(rest.ApiException, self.scenario.run,
                           "test/image", 2, 3)
         self.client.create_rc.assert_called_once_with(
-            None,
             namespace="ns",
             image="test/image",
             replicas=2,
@@ -175,7 +169,6 @@ class CreateScaleAndDeleteReplicationControllerTestCase(test.TestCase):
         self.assertRaises(rest.ApiException, self.scenario.run,
                           "test/image", 2, 3)
         self.client.create_rc.assert_called_once_with(
-            None,
             namespace="ns",
             image="test/image",
             replicas=2,
@@ -199,7 +192,6 @@ class CreateScaleAndDeleteReplicationControllerTestCase(test.TestCase):
         self.assertRaises(rest.ApiException, self.scenario.run,
                           "test/image", 2, 3)
         self.client.create_rc.assert_called_once_with(
-            None,
             command=None,
             namespace="ns",
             replicas=2,

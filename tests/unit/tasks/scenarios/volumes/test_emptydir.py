@@ -39,13 +39,14 @@ class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
 
     def test_create_and_delete_success(self):
         self.client.create_pod.return_value = "name"
-        self.scenario.run("test/image", command=["ls"], name="name",
+        self.scenario.run("test/image",
+                          command=["ls"],
                           mount_path="/opt/check")
 
         self.client.create_pod.assert_called_once_with(
-            "name",
+            "test/image",
+            name="name",
             namespace="ns",
-            image="test/image",
             command=["ls"],
             volume={
                 "mount_path": [
@@ -85,11 +86,11 @@ class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
         ]
 
         self.assertRaises(rest.ApiException, self.scenario.run, "test/image",
-                          name="name", mount_path="/opt/check")
+                          mount_path="/opt/check")
         self.client.create_pod.assert_called_once_with(
-            "name",
+            "test/image",
+            name="name",
             namespace="ns",
-            image="test/image",
             command=None,
             volume={
                 "mount_path": [
@@ -128,13 +129,13 @@ class CreateCheckAndDeleteEmptyDirVolumeTestCase(test.TestCase):
 
     def test_create_and_delete_success(self):
         self.client.create_pod.return_value = "name"
-        self.scenario.run("test/image", command=["ls"], name="name",
-                          check_cmd=["ls"], mount_path="/opt/check")
+        self.scenario.run("test/image", command=["ls"], check_cmd=["ls"],
+                          mount_path="/opt/check")
 
         self.client.create_pod.assert_called_once_with(
-            "name",
+            "test/image",
+            name="name",
             namespace="ns",
-            image="test/image",
             command=["ls"],
             volume={
                 "mount_path": [
@@ -180,12 +181,11 @@ class CreateCheckAndDeleteEmptyDirVolumeTestCase(test.TestCase):
         ]
 
         self.assertRaises(rest.ApiException, self.scenario.run, "test/image",
-                          name="name", mount_path="/opt/check",
-                          check_cmd=["ls"])
+                          mount_path="/opt/check", check_cmd=["ls"])
         self.client.create_pod.assert_called_once_with(
-            "name",
+            "test/image",
+            name="name",
             namespace="ns",
-            image="test/image",
             command=None,
             volume={
                 "mount_path": [
