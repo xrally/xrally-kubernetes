@@ -55,15 +55,22 @@ class KubernetesServiceTestCase(test.TestCase):
         CONF.set_override("status_total_retries", 1, "kubernetes")
         CONF.set_override("start_prepoll_delay", 0, "kubernetes")
 
+        self._k8s_client = None
+
     @property
     def k8s_client(self):
-        spec = {
-            "api_key_prefix": "stub_prefix",
-            "api_key": "stub_key",
-            "server": "stub_server",
-            "certificate-authority": "stub_auth"
-        }
-        return service.Kubernetes(spec, name_generator=mock.MagicMock())
+        if self._k8s_client is None:
+            spec = {
+                "api_key_prefix": "stub_prefix",
+                "api_key": "stub_key",
+                "server": "stub_server",
+                "certificate-authority": "stub_auth"
+            }
+            self._k8s_client = service.Kubernetes(
+                spec,
+                name_generator=mock.MagicMock()
+            )
+        return self._k8s_client
 
 
 class ServiceTestCase(KubernetesServiceTestCase):
@@ -169,6 +176,50 @@ class ServiceTestCase(KubernetesServiceTestCase):
         for key, value in eq_vals.items():
             self.assertEqual(value, getattr(self.config, key))
 
+    def test_create_spec_from_file(self):
+        from kubernetes.config import kube_config
+        patcher = mock.patch('os.path.exists')
+        mock_thing = patcher.start()
+        mock_thing.return_value = True
+        kube_config.load_kube_config = mock.MagicMock()
+        self.config_cls.reset_mock()
+
+        self.config.host = "stub host"
+        self.config.ssl_ca_cert = "stub crt"
+        self.config.api_key = {"authorization": "stub"}
+        self.config.api_key_prefix = {}
+        self.config.cert_file = "client crt"
+        self.config.key_file = "client key"
+        self.config.verify_ssl = False
+
+        expected = {
+            "host": "stub host",
+            "certificate-authority": "stub crt",
+            "api_key": {"authorization": "stub"},
+            "api_key_prefix": {},
+            "client-certificate": "client crt",
+            "client-key": "client key",
+            "tls_insecure": False
+        }
+        self.assertEqual(expected, service.Kubernetes.create_spec_from_file())
+        patcher.stop()
+
+    def test_create_spec_from_file_not_found(self):
+        from kubernetes.config import kube_config
+        patcher = mock.patch('os.path.exists')
+        mock_thing = patcher.start()
+        mock_thing.return_value = False
+        kube_config.load_kube_config = mock.MagicMock()
+        self.config_cls.reset_mock()
+
+        self.assertEqual({}, service.Kubernetes.create_spec_from_file())
+        kube_config.load_kube_config.assert_not_called()
+        self.config_cls.assert_not_called()
+        patcher.stop()
+
+
+class NamespacesTestCase(KubernetesServiceTestCase):
+
     def test_list_namespaces(self):
         self.config_cls.reset_mock()
         self.api_cls.reset_mock()
@@ -207,7 +258,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
-        self.k8s_client.create_namespace("test", status_wait=False)
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "test"
+        self.k8s_client.create_namespace(status_wait=False)
 
         expected = {
             "apiVersion": "v1",
@@ -230,7 +283,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         read_resp.status.phase = "Active"
         self.client.read_namespace.return_value = read_resp
 
-        self.k8s_client.create_namespace("test", status_wait=True)
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "test"
+        self.k8s_client.create_namespace(status_wait=True)
 
         self.client.create_namespace.assert_called_once()
         self.client.read_namespace.assert_called_once_with("test")
@@ -247,7 +302,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_namespace,
-            "test",
             status_wait=True
         )
 
@@ -266,7 +320,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_namespace,
-            "test",
             status_wait=True
         )
 
@@ -287,7 +340,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rally_exc.TimeoutException,
             self.k8s_client.create_namespace,
-            "test",
             status_wait=True
         )
 
@@ -374,47 +426,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.client.delete_namespace.assert_called_once()
         self.assertEqual(2, self.client.read_namespace.call_count)
 
-    def test_create_spec_from_file(self):
-        from kubernetes.config import kube_config
-        patcher = mock.patch('os.path.exists')
-        mock_thing = patcher.start()
-        mock_thing.return_value = True
-        kube_config.load_kube_config = mock.MagicMock()
-        self.config_cls.reset_mock()
-
-        self.config.host = "stub host"
-        self.config.ssl_ca_cert = "stub crt"
-        self.config.api_key = {"authorization": "stub"}
-        self.config.api_key_prefix = {}
-        self.config.cert_file = "client crt"
-        self.config.key_file = "client key"
-        self.config.verify_ssl = False
-
-        expected = {
-            "host": "stub host",
-            "certificate-authority": "stub crt",
-            "api_key": {"authorization": "stub"},
-            "api_key_prefix": {},
-            "client-certificate": "client crt",
-            "client-key": "client key",
-            "tls_insecure": False
-        }
-        self.assertEqual(expected, service.Kubernetes.create_spec_from_file())
-        patcher.stop()
-
-    def test_create_spec_from_file_not_found(self):
-        from kubernetes.config import kube_config
-        patcher = mock.patch('os.path.exists')
-        mock_thing = patcher.start()
-        mock_thing.return_value = False
-        kube_config.load_kube_config = mock.MagicMock()
-        self.config_cls.reset_mock()
-
-        self.assertEqual({}, service.Kubernetes.create_spec_from_file())
-        kube_config.load_kube_config.assert_not_called()
-        self.config_cls.assert_not_called()
-        patcher.stop()
-
     def test_create_serviceaccount(self):
         self.config_cls.reset_mock()
         self.api_cls.reset_mock()
@@ -454,13 +465,17 @@ class ServiceTestCase(KubernetesServiceTestCase):
             namespace="ns"
         )
 
+
+class PodTestCase(KubernetesServiceTestCase):
+
     def test_create_pod(self):
         self.config_cls.reset_mock()
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             status_wait=False)
@@ -493,8 +508,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             command=["ls"],
@@ -529,8 +545,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             command="ls",
@@ -566,8 +583,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
 
         client = self.k8s_client
         client._spec["serviceaccounts"] = True
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             status_wait=False)
@@ -605,8 +623,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         read_resp.status.phase = "Running"
         self.client.read_namespaced_pod.return_value = read_resp
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             status_wait=True
@@ -630,7 +649,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_pod,
-            "name",
             image="test/image",
             namespace="ns",
             status_wait=True
@@ -651,7 +669,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_pod,
-            "name",
             image="test/image",
             namespace="ns",
             status_wait=True
@@ -674,7 +691,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rally_exc.TimeoutException,
             self.k8s_client.create_pod,
-            "name",
             image="test/image",
             namespace="ns",
             status_wait=True
@@ -768,13 +784,17 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.client.delete_namespaced_pod.assert_called_once()
         self.assertEqual(2, self.client.read_namespaced_pod.call_count)
 
+
+class ReplicationControllerTestCase(KubernetesServiceTestCase):
+
     def test_create_replication_controller(self):
         self.config_cls.reset_mock()
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_rc(
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -820,8 +840,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_rc(
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -869,8 +890,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_rc(
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -922,8 +944,9 @@ class ServiceTestCase(KubernetesServiceTestCase):
         resp.status.ready_replicas = 2
         self.client.read_namespaced_replication_controller.return_value = resp
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_rc(
-            "name",
             image="test/image",
             namespace="ns",
             replicas=2,
@@ -950,7 +973,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_rc,
-            "name",
             image="test/image",
             namespace="ns",
             replicas=2,
@@ -976,7 +998,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_rc,
-            "name",
             image="test/image",
             namespace="ns",
             replicas=2,
@@ -1002,7 +1023,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rally_exc.TimeoutException,
             self.k8s_client.create_rc,
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -1132,8 +1152,9 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_replicaset(
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -1184,8 +1205,9 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_replicaset(
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -1238,8 +1260,9 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_replicaset(
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -1296,8 +1319,9 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         resp.status.ready_replicas = 2
         self.client.read_namespaced_replica_set.return_value = resp
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_replicaset(
-            "name",
             image="test/image",
             namespace="ns",
             replicas=2,
@@ -1324,7 +1348,6 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_replicaset,
-            "name",
             image="test/image",
             namespace="ns",
             replicas=2,
@@ -1350,7 +1373,6 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rest.ApiException,
             self.k8s_client.create_replicaset,
-            "name",
             image="test/image",
             namespace="ns",
             replicas=2,
@@ -1376,7 +1398,6 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rally_exc.TimeoutException,
             self.k8s_client.create_replicaset,
-            "name",
             image="test/image",
             replicas=2,
             namespace="ns",
@@ -1489,7 +1510,7 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
         )
 
 
-class PodWithEmptyDirVolumeTestCase(KubernetesServiceTestCase):
+class PodWithVolumeTestCase(KubernetesServiceTestCase):
 
     def test_create_pod_with_volume_and_wait_success(self):
         self.config_cls.reset_mock()
@@ -1504,14 +1525,16 @@ class PodWithEmptyDirVolumeTestCase(KubernetesServiceTestCase):
         event_resp.items = []
         self.client.list_namespaced_event.return_value = event_resp
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             volume={
                 "mount_path": ["stub"],
                 "volume": ["stub"]
             },
+            name=None,
             status_wait=True
         )
 
@@ -1544,7 +1567,6 @@ class PodWithEmptyDirVolumeTestCase(KubernetesServiceTestCase):
         self.assertRaises(
             rally_exc.RallyException,
             self.k8s_client.create_pod,
-            "name",
             image="test/image",
             namespace="ns",
             volume={
@@ -1625,8 +1647,9 @@ class PodWithEmptyDirVolumeTestCase(KubernetesServiceTestCase):
         self.api_cls.reset_mock()
         self.client_cls.reset_mock()
 
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
         self.k8s_client.create_pod(
-            "name",
             image="test/image",
             namespace="ns",
             volume={

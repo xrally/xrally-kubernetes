@@ -22,7 +22,7 @@ class PodWithVolumeBaseScenario(common_scenario.BaseKubernetesScenario):
         """Super class for all kubernetes pod with volume scenarios.
 
         :param image: pod's image
-        :param name: pod's custom name, equals to volume name
+        :param name: pod's name, equals to volume name
         :param check_cmd: pod exec command, available if volume_check is True
         :param command: pod container's command
         :param error_regexp: regexp string to search error in pod exec
@@ -35,8 +35,8 @@ class PodWithVolumeBaseScenario(common_scenario.BaseKubernetesScenario):
         namespace = self.choose_namespace()
 
         name = self.client.create_pod(
-            name,
-            image=image,
+            image,
+            name=name,
             volume=volume,
             namespace=namespace,
             command=command,

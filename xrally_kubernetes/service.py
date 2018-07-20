@@ -235,13 +235,12 @@ class Kubernetes(service.Service):
         return self.v1_client.read_namespace(name)
 
     @atomic.action_timer("kubernetes.create_namespace")
-    def create_namespace(self, name, status_wait=True):
+    def create_namespace(self, status_wait=True):
         """Create namespace and wait until status phase won't be Active.
 
-        :param name: namespace name
         :param status_wait: wait namespace for Active status
         """
-        name = name or self.generate_random_name()
+        name = self.generate_random_name()
 
         manifest = {
             "apiVersion": "v1",
@@ -339,15 +338,15 @@ class Kubernetes(service.Service):
         return self.v1_client.read_namespaced_pod(name, namespace=namespace)
 
     @atomic.action_timer("kubernetes.create_pod")
-    def create_pod(self, name, image, namespace, command=None, volume=None,
-                   status_wait=True):
+    def create_pod(self, image, namespace, command=None, volume=None,
+                   name=None, status_wait=True):
         """Create pod and wait until status phase won't be Running.
 
-        :param name: pod's custom name
         :param image: pod's image
         :param namespace: chosen namespace to create pod into
         :param volume: a dict, which contains `mount_path` and `volume` keys
                with parts of pod's manifest as values
+        :param name: pod's custom name
         :param command: array of strings which represents container command
         :param status_wait: wait pod for Running status
         """
@@ -449,11 +448,10 @@ class Kubernetes(service.Service):
         )
 
     @atomic.action_timer("kubernetes.create_replication_controller")
-    def create_rc(self, name, replicas, image, namespace, command=None,
+    def create_rc(self, replicas, image, namespace, command=None,
                   status_wait=True):
         """Create RC and wait until it won't be running.
 
-        :param name: replication controller name
         :param replicas: number of replicas
         :param image: image for each replica
         :param namespace: replication controller namespace
@@ -461,7 +459,7 @@ class Kubernetes(service.Service):
         :param status_wait: wait replication controller for actual running
                replicas
         """
-        name = name or self.generate_random_name()
+        name = self.generate_random_name()
         app = self.generate_random_name()
 
         container_spec = {
@@ -575,11 +573,10 @@ class Kubernetes(service.Service):
         )
 
     @atomic.action_timer("kubernetes.create_replicaset")
-    def create_replicaset(self, name, namespace, replicas, image,
-                          command=None, status_wait=True):
+    def create_replicaset(self, namespace, replicas, image, command=None,
+                          status_wait=True):
         """Create replicaset and wait until it won't be ready.
 
-        :param name: replicaset name
         :param namespace: replicaset namespace
         :param replicas: number of replicaset replicas
         :param image: container's template image
@@ -587,7 +584,7 @@ class Kubernetes(service.Service):
         :param status_wait: wait for readiness if True
         """
         app = self.generate_random_name()
-        name = name or self.generate_random_name()
+        name = self.generate_random_name()
 
         container_spec = {
             "name": name,

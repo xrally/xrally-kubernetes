@@ -78,7 +78,7 @@ class CreateAndDeleteNamespaceTestCase(test.TestCase):
         scenario.client = client
         scenario.run()
 
-        client.create_namespace.assert_called_once_with(None, status_wait=True)
+        client.create_namespace.assert_called_once_with(status_wait=True)
         client.delete_namespace.assert_called_once_with("a", status_wait=True)
 
     def test_create_failed(self):
@@ -90,7 +90,7 @@ class CreateAndDeleteNamespaceTestCase(test.TestCase):
         scenario.generate_random_name = mock.MagicMock()
         scenario.client = client
         self.assertRaises(rest.ApiException, scenario.run)
-        client.create_namespace.assert_called_once_with(None, status_wait=True)
+        client.create_namespace.assert_called_once_with(status_wait=True)
         self.assertEqual(0, client.delete_namespace.call_count)
 
     def test_delete_failed(self):
@@ -103,5 +103,5 @@ class CreateAndDeleteNamespaceTestCase(test.TestCase):
         scenario.generate_random_name = mock.MagicMock()
         scenario.client = client
         self.assertRaises(rest.ApiException, scenario.run)
-        client.create_namespace.assert_called_once_with(None, status_wait=True)
+        client.create_namespace.assert_called_once_with(status_wait=True)
         client.delete_namespace.assert_called_once_with("a", status_wait=True)

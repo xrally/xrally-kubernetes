@@ -111,9 +111,8 @@ class CreateAndDeletePodTestCase(test.TestCase):
         self.scenario.run("test/image", command=["ls"])
 
         self.client.create_pod.assert_called_once_with(
-            None,
+            "test/image",
             namespace="ns",
-            image="test/image",
             command=["ls"],
             status_wait=True
         )
@@ -150,10 +149,9 @@ class CreateAndDeletePodTestCase(test.TestCase):
 
         self.assertRaises(rest.ApiException, self.scenario.run, "test/image")
         self.client.create_pod.assert_called_once_with(
-            None,
+            "test/image",
             command=None,
             namespace="ns",
-            image="test/image",
             status_wait=True
         )
         self.assertEqual(0, self.client.delete_pod.call_count)
@@ -169,10 +167,9 @@ class CreateAndDeletePodTestCase(test.TestCase):
 
         self.assertRaises(rest.ApiException, self.scenario.run, "test/image")
         self.client.create_pod.assert_called_once_with(
-            None,
+            "test/image",
             command=None,
             namespace="ns",
-            image="test/image",
             status_wait=True
         )
         self.client.get_pod.assert_called_once_with(
