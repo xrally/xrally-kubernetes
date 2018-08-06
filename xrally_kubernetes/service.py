@@ -342,7 +342,7 @@ class Kubernetes(service.Service):
             e_list = self.v1_client.list_namespaced_event(namespace=namespace)
             for item in e_list.items:
                 if item.metadata.name.startswith(name):
-                    if item.reason == "CreateContainerError":
+                    if item.reason in ("CreateContainerError", "Failed"):
                         raise exceptions.RallyException(
                             message="Volume mount failed with %(reason)s and "
                                     "message: %(msg)s" % {
@@ -424,7 +424,8 @@ class Kubernetes(service.Service):
             namespace=namespace,
             command=check_cmd,
             stderr=True, stdin=False,
-            stdout=True, tty=False)
+            stdout=True, tty=False
+        )
 
         regexp = re.search(error_regexp, resp)
         if "exec failed" in resp or (error_regexp and regexp is not None):
