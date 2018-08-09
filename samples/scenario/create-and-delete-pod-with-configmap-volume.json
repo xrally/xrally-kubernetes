@@ -1,0 +1,64 @@
+{
+  "version": 2,
+  "title": "Create, read and delete pod with configMap volume",
+  "subtasks": [
+    {
+      "title": "Run a single workload with create/read/delete pod with configMap volume",
+      "scenario": {
+        "Kubernetes.create_and_delete_pod_with_configmap_volume": {
+          "image": "busybox",
+          "command": [
+            "sleep",
+            "3600"
+          ],
+          "mount_path": "/var/log/check.txt",
+          "subpath": "check.txt",
+          "configmap_data": {
+            "check.txt": "test\n"
+          }
+        }
+      },
+      "runner": {
+        "constant": {
+          "concurrency": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    },
+    {
+      "title": "Run create/read/delete pod with configMap volume with rps runner",
+      "scenario": {
+        "Kubernetes.create_and_delete_pod_with_configmap_volume": {
+          "image": "busybox",
+          "command": [
+            "sleep",
+            "3600"
+          ],
+          "mount_path": "/var/log/check.txt",
+          "subpath": "check.txt",
+          "configmap_data": {
+            "check.txt": "test\n"
+          }
+        }
+      },
+      "runner": {
+        "rps": {
+          "rps": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    }
+  ]
+}
