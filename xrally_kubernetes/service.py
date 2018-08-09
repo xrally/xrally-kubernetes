@@ -855,6 +855,38 @@ class Kubernetes(service.Service):
                                    resource_type="Deployment",
                                    replicas=True)
 
+    @atomic.action_timer("kubernetes.create_configmap")
+    def create_configmap(self, name, namespace, data):
+        """Create configMap resource.
+
+        :param name: configMap resource name
+        :param namespace: configMap namespace
+        :param data: configMap data
+        """
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": name
+            },
+            "data": data
+        }
+        self.v1_client.create_namespaced_config_map(namespace=namespace,
+                                                    body=manifest)
+
+    @atomic.action_timer("kubernetes.delete_configmap")
+    def delete_configmap(self, name, namespace):
+        """Delete configMap resource.
+
+        :param name: configMap name
+        :param namespace: configMap namespace
+        """
+        self.v1_client.delete_namespaced_config_map(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
     @atomic.action_timer("kubernetes.get_job")
     def get_job(self, name, namespace, **kwargs):
         return self.v1_batch.read_namespaced_job(name, namespace=namespace)

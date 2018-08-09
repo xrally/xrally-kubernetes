@@ -202,6 +202,52 @@ subtasks:
       count: 3
       with_serviceaccount: true
 
+- title: Run a single workload with create/read/delete pod with configMap volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_configmap_volume:
+      image: busybox
+      command:
+      - "sleep"
+      - "3600"
+      mount_path: /var/log/check.txt
+      subpath: check.txt
+      configmap_data:
+        check.txt: |
+          test
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/check/delete pod with configMap volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_configmap_volume:
+      image: busybox
+      command:
+      - "sleep"
+      - "3600"
+      mount_path: /var/log/check.txt
+      subpath: check.txt
+      configmap_data:
+        check.txt: |
+          test
+      check_cmd:
+      - cat
+      - /var/log/check.txt
+      error_regexp: No such file
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
 - title: Run a single workload with create/read/delete deployment
   scenario:
     Kubernetes.create_and_delete_deployment:
