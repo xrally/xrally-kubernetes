@@ -1702,3 +1702,68 @@ class PodWithVolumeTestCase(KubernetesServiceTestCase):
             body=expected,
             namespace="ns"
         )
+
+    def test_create_pod_secret_volume(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_pod(
+            image="test/image",
+            namespace="ns",
+            volume={
+                "mount_path": [
+                    {
+                        "name": "stub",
+                        "mountPath": "/check"
+                    }
+                ],
+                "volume": [
+                    {
+                        "name": "stub",
+                        "secret": {
+                            "secretName": "stub"
+                        }
+                    }
+                ]
+            },
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/check",
+                                "name": "stub"
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "stub",
+                        "secret": {
+                            "secretName": "stub"
+                        }
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )

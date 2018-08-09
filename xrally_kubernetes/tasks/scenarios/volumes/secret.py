@@ -18,17 +18,18 @@ from xrally_kubernetes.tasks.scenarios.volumes import base
 
 
 @scenario.configure(
-    name="Kubernetes.create_and_delete_pod_with_emptydir_volume",
+    name="Kubernetes.create_and_delete_pod_with_secret_volume",
     platform="kubernetes"
 )
-class CreateAndDeletePodWithEmptyDirVolume(base.PodWithVolumeBaseScenario):
+class CreateAndDeletePodWithSecretVolume(base.PodWithVolumeBaseScenario):
 
     def run(self, image, mount_path, check_cmd=None, error_regexp=None,
             command=None, status_wait=True):
-        """Create pod with emptyDir volume, optionally check and delete then.
+        """Create pod with secret volume, optionally check and delete then.
 
-        Create pod with emptyDir volume, optionally wait for it's readiness,
-        check volume existence by check_cmd, if it defined and delete pod then.
+        Create secret, create pod with secret volume, optionally wait for it's
+        readiness, check volume existence by check_cmd, if it defined and
+        delete pod and secret then.
 
         :param image: pod's image
         :param mount_path: path to mount volume in pod
@@ -49,12 +50,16 @@ class CreateAndDeletePodWithEmptyDirVolume(base.PodWithVolumeBaseScenario):
             "volume": [
                 {
                     "name": name,
-                    "emptyDir": {}
+                    "secret": {
+                        "secretName": name
+                    }
                 }
             ]
         }
 
-        super(CreateAndDeletePodWithEmptyDirVolume, self).run(
+        self.client.create_secret(name, namespace=self.namespace)
+
+        super(CreateAndDeletePodWithSecretVolume, self).run(
             image,
             name=name,
             command=command,
@@ -63,3 +68,5 @@ class CreateAndDeletePodWithEmptyDirVolume(base.PodWithVolumeBaseScenario):
             volume=volume,
             status_wait=status_wait
         )
+
+        self.client.delete_secret(name, namespace=self.namespace)
