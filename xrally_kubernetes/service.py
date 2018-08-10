@@ -20,6 +20,7 @@ from kubernetes.client.apis import apps_v1_api
 from kubernetes.client.apis import batch_v1_api
 from kubernetes.client.apis import core_v1_api
 from kubernetes.client.apis import extensions_v1beta1_api
+from kubernetes.client.apis import storage_v1_api
 from kubernetes.client.apis import version_api
 from kubernetes.client import rest
 from kubernetes.stream import stream
@@ -201,6 +202,7 @@ class Kubernetes(service.Service):
         self.v1beta1_ext = extensions_v1beta1_api.ExtensionsV1beta1Api(api)
         self.v1_batch = batch_v1_api.BatchV1Api(api)
         self.v1_apps = apps_v1_api.AppsV1Api(api)
+        self.v1_storage = storage_v1_api.StorageV1Api(api)
 
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
@@ -1203,5 +1205,29 @@ class Kubernetes(service.Service):
         self.v1_client.delete_namespaced_service(
             name,
             namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+    @atomic.action_timer("kubernetes.create_local_storageclass")
+    def create_local_storageclass(self):
+        name = self.generate_random_name()
+
+        manifest = {
+            "kind": "StorageClass",
+            "apiVersion": "storage.k8s.io/v1",
+            "metadata": {
+                "name": name
+            },
+            "provisioner": "kubernetes.io/no-provisioner",
+            "volumeBindingMode": "WaitForFirstConsumer"
+        }
+
+        self.v1_storage.create_storage_class(body=manifest)
+        return name
+
+    @atomic.action_timer("kubernetes.delete_local_storageclass")
+    def delete_local_storageclass(self, name):
+        self.v1_storage.delete_storage_class(
+            name,
             body=k8s_config.V1DeleteOptions()
         )
