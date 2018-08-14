@@ -3035,3 +3035,199 @@ class KubernetesServicesServiceTestCase(KubernetesServiceTestCase):
             namespace="ns",
             body=mock.ANY
         )
+
+
+class PodWithLocalPVVolumeTestCase(KubernetesServiceTestCase):
+
+    def test_create_local_pv_no_wait(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_local_pv(
+            None,
+            storage_class="local",
+            size="1Gi",
+            volume_mode="stubMode",
+            local_path="/check",
+            access_modes=["ReadWriteOnly"],
+            node_affinity={"stub": "double stub"},
+            status_wait=False
+        )
+
+        expected = {
+            "kind": "PersistentVolume",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "name"
+            },
+            "spec": {
+                "capacity": {
+                    "storage": "1Gi"
+                },
+                "volumeMode": "stubMode",
+                "accessModes": ["ReadWriteOnly"],
+                "persistentVolumeReclaimPolicy": "Retain",
+                "storageClassName": "local",
+                "local": {
+                    "path": "/check"
+                },
+                "nodeAffinity": {
+                    "stub": "double stub"
+                }
+            }
+        }
+
+        self.client.create_persistent_volume.assert_called_once_with(
+            body=expected)
+
+    def test_create_local_pv_wait_for_status(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        read_resp = mock.MagicMock()
+        read_resp.status.phase = "Available"
+        self.client.read_persistent_volume.return_value = read_resp
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_local_pv(
+            None,
+            storage_class="local",
+            size="1Gi",
+            volume_mode="stubMode",
+            local_path="/check",
+            access_modes=["ReadWriteOnly"],
+            node_affinity={"stub": "double stub"},
+            status_wait=True
+        )
+
+        self.client.create_persistent_volume.assert_called_once()
+        self.client.read_persistent_volume.assert_called_once()
+
+    def test_create_local_pv_wait_for_status_error(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_persistent_volume.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_local_pv,
+            None,
+            storage_class="local",
+            size="1Gi",
+            volume_mode="stubMode",
+            local_path="/check",
+            access_modes=["ReadWriteOnly"],
+            node_affinity={"stub": "double stub"},
+            status_wait=True
+        )
+
+        self.client.create_persistent_volume.assert_called_once()
+
+    def test_create_local_pvc(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.create_local_pvc(
+            "name",
+            namespace="ns",
+            storage_class="local",
+            access_modes=["ReadWriteOnly"],
+            size="1Gi"
+        )
+
+        expected = {
+            "kind": "PersistentVolumeClaim",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "name"
+            },
+            "spec": {
+                "resources": {
+                    "requests": {
+                        "storage": "1Gi"
+                    }
+                },
+                "accessModes": ["ReadWriteOnly"],
+                "storageClassName": "local"
+            }
+        }
+
+        self.client.create_namespaced_persistent_volume_claim(
+            namespace="ns",
+            body=expected
+        )
+
+    def test_create_pod_local_pv_volume(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_pod(
+            image="test/image",
+            namespace="ns",
+            volume={
+                "mount_path": [
+                    {
+                        "mountPath": "/check",
+                        "name": "name"
+                    }
+                ],
+                "volume": [
+                    {
+                        "name": "name",
+                        "persistentVolumeClaim": {
+                            "claimName": "name"
+                        }
+                    }
+                ]
+            },
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "role": "name"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "name": "name",
+                        "image": "test/image",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/check",
+                                "name": "name"
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "name",
+                        "persistentVolumeClaim": {
+                            "claimName": "name"
+                        }
+                    }
+                ]
+            }
+        }
+        self.client.create_namespaced_pod.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )

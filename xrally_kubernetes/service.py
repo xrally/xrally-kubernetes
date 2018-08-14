@@ -39,7 +39,7 @@ def wait_for_status(name, status, read_method, resource_type=None, **kwargs):
     """Util method for polling status until it won't be equals to `status`.
 
     :param name: resource name
-    :param status: status waiting for
+    :param status: status waiting for (string or tuple/list)
     :param read_method: method to poll
     :param resource_type: resource type for extended exceptions
     :param kwargs: additional kwargs for read_method
@@ -54,7 +54,10 @@ def wait_for_status(name, status, read_method, resource_type=None, **kwargs):
         resp = read_method(name=name, **kwargs)
         resp_id = resp.metadata.uid
         current_status = resp.status.phase
-        if resp.status.phase != status:
+        if ((isinstance(status, (list, tuple)) and
+             resp.status.phase not in status) or
+            (isinstance(status, str) and
+             resp.status.phase != status)):
             i += 1
             commonutils.interruptable_sleep(sleep_time)
         else:
@@ -1231,3 +1234,146 @@ class Kubernetes(service.Service):
             name,
             body=k8s_config.V1DeleteOptions()
         )
+
+    @atomic.action_timer("kubernetes.create_local_persistent_volume")
+    def create_local_pv(self, name, storage_class, size, volume_mode,
+                        local_path, access_modes, node_affinity,
+                        status_wait=True):
+        """Create local persistent volume and optionally wait for readiness.
+
+        :param name: local PV name
+        :param storage_class: storageClass created for local PV
+        :param size: PV size (see kubernetes docs)
+        :param volume_mode: PV volume mode (see kubernetes docs)
+        :param local_path: local path on host to bind
+        :param access_modes: array of strings - access modes (see kubernetes
+               docs)
+        :param node_affinity: map represents PV nodeAffinity (see kubernetes
+               docs)
+        :param status_wait: wait for status if True
+        :return: name
+        """
+        name = name or self.generate_random_name()
+
+        manifest = {
+            "kind": "PersistentVolume",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "capacity": {
+                    "storage": size
+                },
+                "volumeMode": volume_mode,
+                "accessModes": access_modes,
+                "persistentVolumeReclaimPolicy": "Retain",
+                "storageClassName": storage_class,
+                "local": {
+                    "path": local_path
+                },
+                "nodeAffinity": node_affinity
+            }
+        }
+
+        self.v1_client.create_persistent_volume(body=manifest)
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_local_persistent_volume_become_ready"
+            ):
+                wait_for_status(name,
+                                status=("Available", "Released"),
+                                read_method=self.get_local_pv,
+                                resource_type="Persistent Volume")
+        return name
+
+    @atomic.action_timer("kubernetes.get_local_persistent_volume")
+    def get_local_pv(self, name):
+        return self.v1_client.read_persistent_volume(name)
+
+    @atomic.action_timer("kubernetes.delete_local_persistent_volume")
+    def delete_local_pv(self, name, status_wait=True):
+        """Delete local PV and optionally wait for not found it.
+
+        :param name: local PV name
+        :param status_wait: wait for termination if True
+        """
+        self.v1_client.delete_persistent_volume(
+            name=name,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                self,
+                "kubernetes.wait_for_local_persistent_volume_termination"
+            ):
+                wait_for_not_found(name,
+                                   read_method=self.get_local_pv,
+                                   resource_type="Persistent Volume")
+
+    @atomic.action_timer("kubernetes.create_local_persistent_volume_claim")
+    def create_local_pvc(self, name, namespace, storage_class, access_modes,
+                         size):
+        """Create local persistent volume claim.
+
+        :param name: local PVC name
+        :param namespace: local PVC namespace
+        :param storage_class: storageClass created for local PV
+        :param access_modes: array of strings - access modes (see kubernetes
+               docs)
+        :param size: PV size (see kubernetes docs)
+        :return:
+        """
+        manifest = {
+            "kind": "PersistentVolumeClaim",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "resources": {
+                    "requests": {
+                        "storage": size
+                    }
+                },
+                "accessModes": access_modes,
+                "storageClassName": storage_class
+            }
+        }
+
+        self.v1_client.create_namespaced_persistent_volume_claim(
+            namespace=namespace,
+            body=manifest
+        )
+
+    @atomic.action_timer("kubernetes.get_local_pvc")
+    def get_local_pvc(self, name, namespace):
+        return self.v1_client.read_namespaced_persistent_volume_claim(
+            name, namespace=namespace)
+
+    @atomic.action_timer("kubernetes.delete_local_pvc")
+    def delete_local_pvc(self, name, namespace, status_wait=True):
+        """Delete local PVC and optionally wait for termination.
+
+        :param name: local PVC name
+        :param namespace: local PVC namespace
+        :param status_wait: wait for termination if True
+        """
+        self.v1_client.delete_namespaced_persistent_volume_claim(
+            name=name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                self,
+                "kubernetes.wait_for_local_persistent_volume_claim_termination"
+            ):
+                wait_for_not_found(name,
+                                   namespace=namespace,
+                                   read_method=self.get_local_pvc,
+                                   resource_type="Persistent Volume Claim")

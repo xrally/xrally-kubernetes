@@ -1,0 +1,122 @@
+{
+  "version": 2,
+  "title": "Create, read, check and delete pod with local persistent volume",
+  "subtasks": [
+    {
+      "title": "Run a single workload with create/read/check/delete pod with local PVC",
+      "scenario": {
+        "Kubernetes.create_and_delete_pod_with_local_persistent_volume": {
+          "persistent_volume": {
+            "size": "1Gi",
+            "volume_mode": "Block",
+            "local_path": "/var/tmp",
+            "access_modes": [
+              "ReadWriteOnce"
+            ],
+            "node_affinity": {
+              "required": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "beta.kubernetes.io/os",
+                        "operator": "In",
+                        "values": [
+                          "linux"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "persistent_volume_claim": {
+            "size": "250Mi",
+            "access_modes": [
+              "ReadWriteOnce"
+            ]
+          },
+          "image": "gcr.io/google-samples/hello-go-gke:1.0",
+          "mount_path": "/opt/check",
+          "check_cmd": [
+            "ls",
+            "/opt/check"
+          ],
+          "error_regexp": "No such file"
+        }
+      },
+      "runner": {
+        "constant": {
+          "concurrency": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        },
+        "local_storageclass": {}
+      }
+    },
+    {
+      "title": "Run create/read/check/delete pod with local PVC with rps runner",
+      "scenario": {
+        "Kubernetes.create_and_delete_pod_with_local_persistent_volume": {
+          "persistent_volume": {
+            "size": "1Gi",
+            "volume_mode": "Block",
+            "local_path": "/var/tmp",
+            "access_modes": [
+              "ReadWriteOnce"
+            ],
+            "node_affinity": {
+              "required": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "beta.kubernetes.io/os",
+                        "operator": "In",
+                        "values": [
+                          "linux"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "persistent_volume_claim": {
+            "size": "250Mi",
+            "access_modes": [
+              "ReadWriteOnce"
+            ]
+          },
+          "image": "gcr.io/google-samples/hello-go-gke:1.0",
+          "mount_path": "/opt/check",
+          "check_cmd": [
+            "ls",
+            "/opt/check"
+          ],
+          "error_regexp": "No such file"
+        }
+      },
+      "runner": {
+        "rps": {
+          "rps": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        },
+        "local_storageclass": {}
+      }
+    }
+  ]
+}
