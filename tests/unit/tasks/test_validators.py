@@ -24,3 +24,74 @@ class RequiredKubernetesPlatformTestCase(test.TestCase):
         self.assertRaises(
             validators.validation.ValidationError,
             validator.validate, {"platforms": {}}, None, None, None)
+
+
+class MapKeysParameterValidatorTestCase(test.TestCase):
+    def test_validate_required(self):
+        validator = validators.MapKeysParameterValidator(
+            param_name="testarg",
+            required=["test1", "test2", "test3"]
+        )
+        self.assertIsNone(
+            validator.validate(None, {"args": {"testarg": {"test1": "",
+                                                           "test2": "",
+                                                           "test3": "",
+                                                           "test4": ""}}},
+                               None, None))
+        msg = self.assertRaises(
+            validators.validation.ValidationError,
+            validator.validate, None, {"args": {"testarg": {"test1": ""}}},
+            None, None
+        )
+        self.assertEqual("Required keys is missing in 'testarg' parameter: "
+                         "test2, test3", str(msg))
+
+        msg = self.assertRaises(
+            validators.validation.ValidationError,
+            validator.validate, None, {}, None, None
+        )
+        self.assertEqual("'testarg' parameter is not defined in "
+                         "the task config file", str(msg))
+
+    def test_validate_allowed(self):
+        validator = validators.MapKeysParameterValidator(
+            param_name="testarg",
+            required=["test1", "test2"],
+            allowed=["test1", "test2", "test3"]
+        )
+        self.assertIsNone(
+            validator.validate(None, {"args": {"testarg": {"test1": "",
+                                                           "test2": "",
+                                                           "test3": ""}}},
+                               None, None)
+        )
+        self.assertIsNone(
+            validator.validate(None, {"args": {"testarg": {"test1": "",
+                                                           "test2": ""}}},
+                               None, None)
+        )
+        ex = self.assertRaises(
+            validators.validation.ValidationError,
+            validator.validate, None, {"args": {"testarg": {"test1": "",
+                                                            "test2": "",
+                                                            "test3": "",
+                                                            "test4": ""}}},
+            None, None)
+        self.assertEqual("Parameter 'testarg' contains unallowed keys: test4",
+                         str(ex))
+
+    def test_validate_additional(self):
+        validator = validators.MapKeysParameterValidator(
+            param_name="testarg",
+            required=["test1", "test2"],
+            additional=False
+        )
+        ex = self.assertRaises(
+            validators.validation.ValidationError,
+            validator.validate, None, {"args": {"testarg": {"test1": "",
+                                                            "test2": "",
+                                                            "test3": "",
+                                                            "test4": ""}}},
+            None, None)
+        self.assertEqual("Parameter 'testarg' contains unallowed keys: test3, "
+                         "test4", str(ex))
