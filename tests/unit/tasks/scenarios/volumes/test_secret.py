@@ -17,13 +17,13 @@ import mock
 from kubernetes.client import rest
 
 from tests.unit import test
-from xrally_kubernetes.tasks.scenarios.volumes import emptydir
+from xrally_kubernetes.tasks.scenarios.volumes import secret
 
 
-class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
+class CreateAndDeleteSecretVolumeTestCase(test.TestCase):
 
     def setUp(self):
-        super(CreateAndDeleteEmptyDirVolumeTestCase, self).setUp()
+        super(CreateAndDeleteSecretVolumeTestCase, self).setUp()
         context = {
             "iteration": 1,
             "kubernetes": {
@@ -31,7 +31,7 @@ class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
                 "namespace_choice_method": "round_robin"
             }
         }
-        self.scenario = emptydir.CreateAndDeletePodWithEmptyDirVolume(context)
+        self.scenario = secret.CreateAndDeletePodWithSecretVolume(context)
         self.client = mock.MagicMock()
         self.scenario.client = self.client
         self.scenario.generate_random_name = mock.MagicMock()
@@ -58,7 +58,9 @@ class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
                 "volume": [
                     {
                         "name": "name",
-                        "emptyDir": {}
+                        "secret": {
+                            "secretName": "name"
+                        }
                     }
                 ]
             },
@@ -102,7 +104,9 @@ class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
                 "volume": [
                     {
                         "name": "name",
-                        "emptyDir": {}
+                        "secret": {
+                            "secretName": "name"
+                        }
                     }
                 ]
             },
@@ -110,10 +114,10 @@ class CreateAndDeleteEmptyDirVolumeTestCase(test.TestCase):
         )
 
 
-class CreateCheckAndDeleteEmptyDirVolumeTestCase(test.TestCase):
+class CreateCheckAndDeleteSecretVolumeTestCase(test.TestCase):
 
     def setUp(self):
-        super(CreateCheckAndDeleteEmptyDirVolumeTestCase, self).setUp()
+        super(CreateCheckAndDeleteSecretVolumeTestCase, self).setUp()
         context = {
             "iteration": 1,
             "kubernetes": {
@@ -121,7 +125,7 @@ class CreateCheckAndDeleteEmptyDirVolumeTestCase(test.TestCase):
                 "namespace_choice_method": "round_robin"
             }
         }
-        self.scenario = emptydir.CreateAndDeletePodWithEmptyDirVolume(context)
+        self.scenario = secret.CreateAndDeletePodWithSecretVolume(context)
         self.client = mock.MagicMock()
         self.scenario.client = self.client
         self.scenario.generate_random_name = mock.MagicMock()
@@ -147,7 +151,9 @@ class CreateCheckAndDeleteEmptyDirVolumeTestCase(test.TestCase):
                 "volume": [
                     {
                         "name": "name",
-                        "emptyDir": {}
+                        "secret": {
+                            "secretName": "name"
+                        }
                     }
                 ]
             },
@@ -197,7 +203,9 @@ class CreateCheckAndDeleteEmptyDirVolumeTestCase(test.TestCase):
                 "volume": [
                     {
                         "name": "name",
-                        "emptyDir": {}
+                        "secret": {
+                            "secretName": "name"
+                        }
                     }
                 ]
             },

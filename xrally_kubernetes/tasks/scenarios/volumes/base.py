@@ -17,6 +17,11 @@ from xrally_kubernetes.tasks import scenario as common_scenario
 
 class PodWithVolumeBaseScenario(common_scenario.BaseKubernetesScenario):
     """Base scenario plugin for all pod with volume scenarios."""
+
+    def __init__(self, context=None):
+        super(PodWithVolumeBaseScenario, self).__init__(context)
+        self.namespace = self.choose_namespace()
+
     def run(self, image, name=None, check_cmd=None, command=None,
             error_regexp=None, volume=None, status_wait=True):
         """Super class for all kubernetes pod with volume scenarios.
@@ -30,15 +35,12 @@ class PodWithVolumeBaseScenario(common_scenario.BaseKubernetesScenario):
         :param volume: a dict, which contains `mount_path` and `volume` keys
                with parts of pod's manifest as values
         :param status_wait: wait for pod's status if True
-        :param volume_check: enable check_volume_pod call or not
         """
-        namespace = self.choose_namespace()
-
         name = self.client.create_pod(
             image,
             name=name,
             volume=volume,
-            namespace=namespace,
+            namespace=self.namespace,
             command=command,
             status_wait=status_wait
         )
@@ -46,13 +48,13 @@ class PodWithVolumeBaseScenario(common_scenario.BaseKubernetesScenario):
         if check_cmd:
             self.client.check_volume_pod(
                 name,
-                namespace=namespace,
+                namespace=self.namespace,
                 check_cmd=check_cmd,
                 error_regexp=error_regexp
             )
 
         self.client.delete_pod(
             name,
-            namespace=namespace,
+            namespace=self.namespace,
             status_wait=status_wait
         )

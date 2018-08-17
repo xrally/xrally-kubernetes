@@ -186,6 +186,7 @@ class Kubernetes(service.Service):
             if self._spec.get("tls_insecure", False):
                 config.verify_ssl = False
 
+        config.assert_hostname = False
         if self._k8s_client_version == 3:
             api = api_client.ApiClient(config=config)
         else:
@@ -316,6 +317,19 @@ class Kubernetes(service.Service):
         }
         self.v1_client.create_namespaced_secret(namespace=namespace,
                                                 body=secret_manifest)
+
+    @atomic.action_timer("kubernetes.delete_secret")
+    def delete_secret(self, name, namespace):
+        """Delete secret.
+
+        :param name: secret name
+        :param namespace: namespace where secret should be created
+        """
+        self.v1_client.delete_namespaced_secret(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
 
     @atomic.action_timer("kubernetes.get_pod")
     def get_pod(self, name, namespace, **kwargs):
