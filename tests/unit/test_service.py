@@ -2429,3 +2429,378 @@ class JobServiceTestCase(KubernetesServiceTestCase):
 
         self.client.delete_namespaced_job.assert_called_once()
         self.assertEqual(2, self.client.read_namespaced_job.call_count)
+
+
+class StatefulSetServiceTestCase(KubernetesServiceTestCase):
+
+    def setUp(self):
+        super(StatefulSetServiceTestCase, self).setUp()
+
+        from kubernetes.client.apis import apps_v1_api
+
+        p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
+        self.client_cls = p_mock_client.start()
+        self.client = self.client_cls.return_value
+        self.addCleanup(p_mock_client.stop)
+
+    def test_create_statefulset(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_statefulset(
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "app": mock.ANY
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
+                "replicas": 2,
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "image": "test/image",
+                                "name": "name"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_statefulset_with_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_statefulset(
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command=["ls"],
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "app": mock.ANY
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
+                "replicas": 2,
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "image": "test/image",
+                                "name": "name",
+                                "command": ["ls"]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_statefulset_with_incorrect_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_statefulset(
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command="ls",
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "app": mock.ANY
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
+                "replicas": 2,
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "image": "test/image",
+                                "name": "name"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_statefulset_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        resp = mock.MagicMock()
+        resp.status.replicas = 2
+        resp.status.ready_replicas = 2
+        self.client.read_namespaced_stateful_set.return_value = resp
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_statefulset(
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once())
+        (self.client.read_namespaced_stateful_set
+            .assert_called_once_with(
+                "name",
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_statefulset_fail_create(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespaced_stateful_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_statefulset,
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once())
+        self.assertEqual(
+            0,
+            self.client.read_namespaced_stateful_set.call_count
+        )
+
+    def test_create_and_wait_statefulset_fail_read(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_stateful_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_statefulset,
+            image="test/image",
+            namespace="ns",
+            replicas=2,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once())
+        (self.client.read_namespaced_stateful_set
+         .assert_called_once())
+
+    def test_create_and_wait_statefulset_read_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        resp = mock.MagicMock()
+        resp.status.ready_replicas = None
+        self.client.read_namespaced_stateful_set.return_value = resp
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.create_statefulset,
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_stateful_set
+            .assert_called_once())
+        self.assertEqual(
+            2,
+            self.client.read_namespaced_stateful_set.call_count
+        )
+
+    def test_delete_statefulset(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        from kubernetes import client as k8s_config
+
+        self.k8s_client.delete_statefulset("test", namespace="ns",
+                                           status_wait=False)
+
+        (self.client.delete_namespaced_stateful_set
+            .assert_called_once_with(
+                "test",
+                body=k8s_config.V1DeleteOptions(),
+                namespace="ns"
+            ))
+
+    def test_delete_statefulset_and_wait_termination_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_stateful_set.side_effect = [
+            rest.ApiException(status=404, reason="Not found")
+        ]
+
+        self.k8s_client.delete_statefulset("test", namespace="ns")
+
+        (self.client.delete_namespaced_stateful_set
+            .assert_called_once())
+        (self.client.read_namespaced_stateful_set
+            .assert_called_once_with("test", namespace="ns"))
+
+    def test_delete_statefulset_delete_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespaced_stateful_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_statefulset,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_stateful_set
+            .assert_called_once())
+        self.assertEqual(
+            0,
+            self.client.read_namespaced_stateful_set.call_count
+        )
+
+    def test_delete_statefulset_read_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_stateful_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_statefulset,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_stateful_set
+            .assert_called_once())
+        (self.client.read_namespaced_stateful_set
+            .assert_called_once_with("test", namespace="ns"))
+
+    def test_delete_statefulset_and_wait_termination_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.delete_statefulset,
+            "test",
+            namespace="ns"
+        )
+
+        (self.client.delete_namespaced_stateful_set
+            .assert_called_once())
+        self.assertEqual(
+            2,
+            self.client.read_namespaced_stateful_set.call_count
+        )

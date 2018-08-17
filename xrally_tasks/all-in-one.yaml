@@ -173,7 +173,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -196,7 +196,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -210,7 +210,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -234,7 +234,36 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete statefulset
+  scenario:
+    Kubernetes.create_and_delete_statefulset:
+      image: kubernetes/pause
+      replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/scale/delete statefulset
+  scenario:
+    Kubernetes.create_scale_and_delete_statefulset:
+      image: kubernetes/pause
+      replicas: 1
+      scale_replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
   contexts:
     namespaces:
       count: 3
