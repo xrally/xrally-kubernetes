@@ -16,6 +16,7 @@ import re
 
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
+from kubernetes.client.apis import batch_v1_api
 from kubernetes.client.apis import core_v1_api
 from kubernetes.client.apis import extensions_v1beta1_api
 from kubernetes.client.apis import version_api
@@ -120,7 +121,11 @@ def wait_for_not_found(name, read_method, resource_type=None, **kwargs):
         try:
             resp = read_method(name=name, **kwargs)
             resp_id = resp.metadata.uid
-            if hasattr(resp.status, "phase"):
+            if kwargs.get("replicas"):
+                current_status = "%s replicas" % resp.status.replicas
+            elif kwargs.get("active"):
+                current_status = resp.status.active
+            elif hasattr(resp.status, "phase"):
                 current_status = resp.status.phase
             else:
                 current_status = "Unknown"
@@ -193,6 +198,7 @@ class Kubernetes(service.Service):
         self.api = api
         self.v1_client = core_v1_api.CoreV1Api(api)
         self.v1beta1_ext = extensions_v1beta1_api.ExtensionsV1beta1Api(api)
+        self.v1_batch = batch_v1_api.BatchV1Api(api)
 
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
@@ -836,3 +842,103 @@ class Kubernetes(service.Service):
                                    namespace=namespace,
                                    resource_type="Deployment",
                                    replicas=True)
+
+    @atomic.action_timer("kubernetes.get_job")
+    def get_job(self, name, namespace, **kwargs):
+        return self.v1_batch.read_namespaced_job(name, namespace=namespace)
+
+    @atomic.action_timer("kubernetes.create_job")
+    def create_job(self, namespace, image, command, name=None,
+                   status_wait=True):
+        """Create job and optionally wait for status.
+
+        :param namespace: job chosen namespace
+        :param image: job container's image
+        :param command: job container's command
+        :param name: job custom name
+        :param status_wait: wait for status if True
+        :return: name
+        """
+        name = name or self.generate_random_name()
+
+        manifest = {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "name": name
+                    },
+                    "spec": {
+                        "restartPolicy": "Never",
+                        "serviceAccountName": namespace,
+                        "containers": [
+                            {
+                                "name": name,
+                                "image": image,
+                                "command": command
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["template"]["spec"]["serviceAccountName"]
+
+        self.v1_batch.create_namespaced_job(namespace=namespace, body=manifest)
+
+        if status_wait:
+            with atomic.ActionTimer(self, "kubernetes.wait_job_for_success"):
+                sleep_time = CONF.kubernetes.status_poll_interval
+                retries_total = CONF.kubernetes.status_total_retries
+
+                commonutils.interruptable_sleep(
+                    CONF.kubernetes.start_prepoll_delay)
+
+                i = 0
+                while i < retries_total:
+                    resp = self.get_job(name=name, namespace=namespace)
+                    resp_id = resp.metadata.uid
+                    current_status = resp.status.succeeded
+                    if current_status != 1:
+                        i += 1
+                        commonutils.interruptable_sleep(sleep_time)
+                    else:
+                        break
+                    if i == retries_total:
+                        raise exceptions.TimeoutException(
+                            desired_status="1 succeeded",
+                            resource_name=name,
+                            resource_type="Job",
+                            resource_id=resp_id or "<no id>",
+                            resource_status="%s succeeded" % current_status,
+                            timeout=(retries_total * sleep_time))
+        return name
+
+    @atomic.action_timer("kubernetes.delete_job")
+    def delete_job(self, name, namespace, status_wait=True):
+        """Delete job and optionally wait for termination.
+
+        :param name: job name
+        :param namespace: job namespace
+        :param status_wait: wait for termination if True
+        """
+        self.v1_batch.delete_namespaced_job(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(self,
+                                    "kubernetes.wait_job_for_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_job,
+                                   resource_type="Job",
+                                   namespace=namespace,
+                                   active=True)
