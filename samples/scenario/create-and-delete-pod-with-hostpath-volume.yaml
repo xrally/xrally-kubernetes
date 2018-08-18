@@ -1,0 +1,34 @@
+---
+version: 2
+title: Create, read and delete pod with hostPath volume
+subtasks:
+- title: Run a single workload with create/read/delete pod with hostPath volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_hostpath_volume:
+      image: kubernetes/pause
+      mount_path: /opt/check
+      volume_type: Directory
+      volume_path: /tmp/
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+- title: Run create/read/delete pod with hostPath volume with rps runner
+  scenario:
+    Kubernetes.create_and_delete_pod_with_hostpath_volume:
+      image: kubernetes/pause
+      mount_path: /opt/check
+      volume_type: Directory
+      volume_path: /tmp/
+  runner:
+    rps:
+      rps: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true

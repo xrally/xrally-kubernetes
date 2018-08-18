@@ -20,7 +20,7 @@ KUBERNETES_OPTS = [
                  default=0.0,
                  help="Time to sleep before polling for status"),
     cfg.IntOpt("status_total_retries",
-               default=50,
+               default=60,
                help="Kubernetes total retries to read resource status"),
     cfg.FloatOpt("status_poll_interval",
                  default=1.0,

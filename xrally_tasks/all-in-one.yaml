@@ -162,3 +162,42 @@ subtasks:
     namespaces:
       count: 3
       with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete pod with hostPath volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_hostpath_volume:
+      image: kubernetes/pause
+      mount_path: /opt/check
+      volume_type: Directory
+      volume_path: /tmp/
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/check/delete pod with hostPath volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_hostpath_volume:
+      image: busybox
+      command:
+      - sleep
+      - "3600"
+      mount_path: /opt/check
+      check_cmd:
+      - ls
+      - /opt/check
+      error_regexp: No such file
+      volume_type: Directory
+      volume_path: /tmp/
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true

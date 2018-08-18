@@ -30,6 +30,9 @@ matrix:
         CHANGE_MINIKUBE_NONE_USER=true  # This moves Kubernetes specific config files.
       # the idea is taken from https://github.com/LiliC/travis-minikube
       before_script:
+        # Install required packages
+        - sudo apt-get update
+        - sudo apt install systemd
         # Download kubectl, which is a requirement for using minikube.
         - curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.9.0/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
         # Download minikube.
@@ -39,6 +42,11 @@ matrix:
         - minikube update-context
         # Wait for Kubernetes to be up and ready.
         - JSONPATH='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}'; until kubectl get nodes -o jsonpath="$JSONPATH" 2>&1 | grep -q "Ready=True"; do sleep 1; done
+        # Change MountFlags configuration due to kubernetes docs recommendation
+        - sudo sed -i '/MountFlags=/d' /lib/systemd/system/docker.service
+        - sudo echo MountFlags=shared >> sudo /lib/systemd/system/docker.service
+        - sudo systemctl daemon-reload
+        - sudo service docker restart
 
 script:
   - tox
