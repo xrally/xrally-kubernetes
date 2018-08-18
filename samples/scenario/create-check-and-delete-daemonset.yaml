@@ -1,0 +1,28 @@
+---
+version: 2
+title: Create, read and delete daemonset with random name
+subtasks:
+- title: Run a single workload with create/check/delete daemonset
+  scenario:
+    Kubernetes.create_check_and_delete_daemonset:
+      image: kubernetes/pause
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+- title: Run create/check/delete daemonset with rps runner
+  scenario:
+    Kubernetes.create_check_and_delete_daemonset:
+      image: kubernetes/pause
+  runner:
+    rps:
+      rps: 2
+      times: 10
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
