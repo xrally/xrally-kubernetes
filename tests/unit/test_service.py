@@ -3231,3 +3231,448 @@ class PodWithLocalPVVolumeTestCase(KubernetesServiceTestCase):
             body=expected,
             namespace="ns"
         )
+
+
+class DaemonSetServiceTestCase(KubernetesServiceTestCase):
+
+    def setUp(self):
+        super(DaemonSetServiceTestCase, self).setUp()
+
+        from kubernetes.client.apis import core_v1_api
+        from kubernetes.client.apis import extensions_v1beta1_api
+
+        p_mock_client = mock.patch.object(extensions_v1beta1_api,
+                                          "ExtensionsV1beta1Api")
+        self.client_cls = p_mock_client.start()
+        self.client = self.client_cls.return_value
+        self.addCleanup(p_mock_client.stop)
+
+        p_mock_client_v1 = mock.patch.object(core_v1_api, "CoreV1Api")
+        self.client_v1_cls = p_mock_client_v1.start()
+        self.client_v1 = self.client_v1_cls.return_value
+        self.addCleanup(p_mock_client_v1.stop)
+
+    def test_create_daemonset(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_daemonset(
+            image="test/image",
+            namespace="ns",
+            node_labels=None,
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "DaemonSet",
+            "metadata": {
+                "name": "name"
+            },
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "image": "test/image",
+                                "name": "name"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_daemon_set
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_daemonset_with_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_daemonset(
+            image="test/image",
+            namespace="ns",
+            command=["ls"],
+            node_labels=None,
+            status_wait=False)
+
+        expected = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "DaemonSet",
+            "metadata": {
+                "name": "name"
+            },
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "image": "test/image",
+                                "name": "name",
+                                "command": ["ls"]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_daemon_set
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_daemonset_with_incorrect_command(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_daemonset(
+            image="test/image",
+            namespace="ns",
+            command="ls",
+            node_labels=None,
+            status_wait=False)
+
+        expected = expected = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "DaemonSet",
+            "metadata": {
+                "name": "name"
+            },
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "name": "name",
+                        "labels": {
+                            "app": mock.ANY
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "image": "test/image",
+                                "name": "name"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        (self.client.create_namespaced_daemon_set
+            .assert_called_once_with(
+                body=expected,
+                namespace="ns"
+            ))
+
+    def test_create_and_wait_daemonset_success_node_no_filter(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        self.client_v1_cls.reset_mock()
+
+        resp = mock.MagicMock()
+        resp.status.number_ready = 1
+        self.client.read_namespaced_daemon_set.return_value = resp
+
+        node = mock.MagicMock()
+        node.metadata.name = "n"
+        nodes = mock.MagicMock()
+        nodes.items = [node]
+        self.client_v1.list_node.return_value = nodes
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_daemonset(
+            image="test/image",
+            namespace="ns",
+            node_labels=None,
+            status_wait=True
+        )
+
+        self.client.create_namespaced_daemon_set.assert_called_once()
+        self.client.read_namespaced_daemon_set.assert_called_once_with(
+            "name",
+            namespace="ns"
+        )
+        self.client_v1.list_node.assert_called_once()
+
+    def test_create_and_wait_daemonset_success_node_filtered(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        self.client_v1_cls.reset_mock()
+
+        resp = mock.MagicMock()
+        resp.status.number_ready = 1
+        self.client.read_namespaced_daemon_set.return_value = resp
+
+        node1 = mock.MagicMock()
+        node1.metadata.name = "n"
+        node1.metadata.labels = {
+            "test/node": "true"
+        }
+        node2 = mock.MagicMock()
+        node2.metadata.name = "n3"
+        node2.metadata.labels = {
+            "test/node": "false"
+        }
+        nodes = mock.MagicMock()
+        nodes.items = [node1, node2]
+        self.client_v1.list_node.return_value = nodes
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        self.k8s_client.create_daemonset(
+            image="test/image",
+            namespace="ns",
+            node_labels={"test/node": "true"},
+            status_wait=True
+        )
+
+        self.client.create_namespaced_daemon_set.assert_called_once()
+        self.client.read_namespaced_daemon_set.assert_called_once_with(
+            "name",
+            namespace="ns"
+        )
+        self.client_v1.list_node.assert_called_once()
+
+    def test_create_and_wait_daemonset_fail_create(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespaced_daemon_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_daemonset,
+            image="test/image",
+            namespace="ns",
+            node_labels=None,
+            status_wait=True
+        )
+
+        (self.client.create_namespaced_daemon_set
+            .assert_called_once())
+        self.assertEqual(0, self.client.read_namespaced_daemon_set.call_count)
+
+    def test_create_and_wait_daemonset_fail_read(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_daemon_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_daemonset,
+            image="test/image",
+            namespace="ns",
+            node_labels=None,
+            status_wait=True
+        )
+
+        self.client.create_namespaced_daemon_set.assert_called_once()
+        self.client.read_namespaced_daemon_set.assert_called_once()
+        self.assertEqual(0, self.client_v1.list_node.call_count)
+
+    def test_delete_daemonset(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        from kubernetes import client as k8s_config
+
+        self.k8s_client.delete_daemonset("test", namespace="ns",
+                                         status_wait=False)
+
+        self.client.delete_namespaced_daemon_set.assert_called_once_with(
+            "test",
+            body=k8s_config.V1DeleteOptions(),
+            namespace="ns"
+        )
+
+    def test_delete_daemonset_and_wait_termination_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_daemon_set.side_effect = [
+            rest.ApiException(status=404, reason="Not found")
+        ]
+
+        self.k8s_client.delete_daemonset("test", namespace="ns")
+
+        self.client.delete_namespaced_daemon_set.assert_called_once()
+        self.client.read_namespaced_daemon_set.assert_called_once_with(
+            "test",
+            namespace="ns"
+        )
+
+    def test_delete_daemonset_delete_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespaced_daemon_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_daemonset,
+            "test",
+            namespace="ns"
+        )
+
+        self.client.delete_namespaced_daemon_set.assert_called_once()
+        self.assertEqual(0, self.client.read_namespaced_daemon_set.call_count)
+
+    def test_delete_daemonset_read_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_daemon_set.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_daemonset,
+            "test",
+            namespace="ns"
+        )
+
+        self.client.delete_namespaced_daemon_set.assert_called_once()
+        self.client.read_namespaced_daemon_set.assert_called_once_with(
+            "test",
+            namespace="ns"
+        )
+
+    def test_delete_daemonset_and_wait_termination_timeout(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        CONF.set_override("status_total_retries", 2, "kubernetes")
+
+        self.assertRaises(
+            rally_exc.TimeoutException,
+            self.k8s_client.delete_daemonset,
+            "test",
+            namespace="ns"
+        )
+
+        self.client.delete_namespaced_daemon_set.assert_called_once()
+        self.assertEqual(2, self.client.read_namespaced_daemon_set.call_count)
+
+    def test_check_daemonsets_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        self.client_v1_cls.reset_mock()
+
+        node1 = mock.MagicMock()
+        node1.metadata.name = "n"
+        node1.metadata.labels = {
+            "test/node": "true"
+        }
+        node2 = mock.MagicMock()
+        node2.metadata.name = "n3"
+        node2.metadata.labels = {
+            "test/node": "false"
+        }
+        nodes = mock.MagicMock()
+        nodes.items = [node1, node2]
+        self.client_v1.list_node.return_value = nodes
+
+        pod = mock.MagicMock()
+        pod.spec.node_name = "n"
+        pods = mock.MagicMock()
+        pods.items = [pod]
+        self.client_v1.list_namespaced_pod.return_value = pods
+
+        self.k8s_client.check_daemonset(
+            "ns",
+            app="testapp",
+            node_labels={"test/node": "true"}
+        )
+
+        self.client_v1.list_namespaced_pod.assert_called_once_with(
+            namespace="ns",
+            label_selector="app=testapp"
+        )
+        self.client_v1.list_node.assert_called_once()
+
+    def test_check_daemonsets_fail(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        self.client_v1_cls.reset_mock()
+
+        node1 = mock.MagicMock()
+        node1.metadata.name = "n"
+        node1.metadata.labels = {
+            "test/node": "true"
+        }
+        node2 = mock.MagicMock()
+        node2.metadata.name = "n2"
+        node2.metadata.labels = {
+            "test/node": "true"
+        }
+        node3 = mock.MagicMock()
+        node3.metadata.name = "n3"
+        node3.metadata.labels = {
+            "test/node": "false"
+        }
+        nodes = mock.MagicMock()
+        nodes.items = [node1, node2, node3]
+        self.client_v1.list_node.return_value = nodes
+
+        pod = mock.MagicMock()
+        pod.spec.node_name = "n"
+        pods = mock.MagicMock()
+        pods.items = [pod]
+        self.client_v1.list_namespaced_pod.return_value = pods
+
+        self.assertRaises(
+            rally_exc.RallyException,
+            self.k8s_client.check_daemonset,
+            "ns",
+            app="testapp",
+            node_labels={"test/node": "true"}
+        )
+
+        self.client_v1.list_namespaced_pod.assert_called_once_with(
+            namespace="ns",
+            label_selector="app=testapp"
+        )
+        self.client_v1.list_node.assert_called_once()
