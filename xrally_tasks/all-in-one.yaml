@@ -9,7 +9,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
 
 - title: Run a single workload with create/read/delete namespace
   scenario:
@@ -17,7 +17,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
 
 - title: Run a single workload with create/read/delete pod
   scenario:
@@ -26,7 +26,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -40,7 +40,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -55,7 +55,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -69,7 +69,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -84,7 +84,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -98,7 +98,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -119,7 +119,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -136,7 +136,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -157,7 +157,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
