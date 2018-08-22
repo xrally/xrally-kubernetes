@@ -2804,3 +2804,166 @@ class StatefulSetServiceTestCase(KubernetesServiceTestCase):
             2,
             self.client.read_namespaced_stateful_set.call_count
         )
+
+
+class KubernetesServicesServiceTestCase(KubernetesServiceTestCase):
+
+    def test_create_service_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": "name",
+                "labels": {
+                    "check-label": "true"
+                }
+            },
+            "spec": {
+                "type": "ClusterIP",
+                "ports": [
+                    {
+                        "port": 80,
+                        "protocol": "TCP"
+                    }
+                ],
+                "selector": {
+                    "check-label": "true"
+                }
+            }
+        }
+
+        self.k8s_client.create_service(
+            "name",
+            namespace="ns",
+            port=80,
+            protocol="TCP",
+            type="ClusterIP",
+            labels={"check-label": "true"}
+        )
+
+        self.client.create_namespaced_service.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+    def test_create_service_fail(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.create_namespaced_service.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.create_service,
+            "name",
+            namespace="ns",
+            port=80,
+            protocol="TCP",
+            type="ClusterIP",
+            labels={"check-label": "true"}
+        )
+
+    def test_get_service_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        self.k8s_client.get_service("name", namespace="ns")
+        self.client.read_namespaced_service.assert_called_once()
+
+    def test_get_service_fail(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.read_namespaced_service.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.get_service,
+            "name",
+            namespace="ns"
+        )
+
+    def test_delete_service_success(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+        self.k8s_client.delete_service("name", namespace="ns")
+        self.client.delete_namespaced_service.assert_called_once_with(
+            "name",
+            namespace="ns",
+            body=mock.ANY
+        )
+
+    def test_delete_service_failed(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.client.delete_namespaced_service.side_effect = [
+            rest.ApiException(status=500, reason="Test")
+        ]
+
+        self.assertRaises(
+            rest.ApiException,
+            self.k8s_client.delete_service,
+            "name",
+            namespace="ns"
+        )
+
+    def test_create_get_and_endpoints(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        expected = {
+            "apiVersion": "v1",
+            "kind": "Endpoints",
+            "metadata": {
+                "name": "name"
+            },
+            "subsets": [
+                {
+                    "addresses": [
+                        {
+                            "ip": "10.0.0.3"
+                        }
+                    ],
+                    "ports": [
+                        {
+                            "port": "30433"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        self.k8s_client.create_endpoints(
+            "name",
+            namespace="ns",
+            ip="10.0.0.3",
+            port="30433"
+        )
+        self.client.create_namespaced_endpoints.assert_called_once_with(
+            body=expected,
+            namespace="ns"
+        )
+
+        self.k8s_client.get_endpoints("name", namespace="ns")
+        self.client.read_namespaced_endpoints.assert_called_once()
+
+        self.k8s_client.delete_endpoints("name", namespace="ns")
+        self.client.delete_namespaced_endpoints.assert_called_once_with(
+            "name",
+            namespace="ns",
+            body=mock.ANY
+        )

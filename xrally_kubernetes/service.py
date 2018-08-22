@@ -359,7 +359,8 @@ class Kubernetes(service.Service):
 
     @atomic.action_timer("kubernetes.create_pod")
     def create_pod(self, image, namespace, command=None, volume=None,
-                   name=None, status_wait=True):
+                   port=None, protocol=None, labels=None, name=None,
+                   status_wait=True):
         """Create pod and wait until status phase won't be Running.
 
         :param image: pod's image
@@ -367,6 +368,9 @@ class Kubernetes(service.Service):
         :param volume: a dict, which contains `mount_path` and `volume` keys
                with parts of pod's manifest as values
         :param name: pod's custom name
+        :param port: integer that represents container port
+        :param protocol: container port's protocol
+        :param labels: additional labels for pod
         :param command: array of strings which represents container command
         :param status_wait: wait pod for Running status
         """
@@ -380,6 +384,10 @@ class Kubernetes(service.Service):
             container_spec["command"] = list(command)
         if volume and volume.get("mount_path"):
             container_spec["volumeMounts"] = volume["mount_path"]
+        if port is not None and isinstance(port, int) and port > 0:
+            container_spec["ports"] = [{"containerPort": port}]
+            if protocol is not None:
+                container_spec["ports"][0]["protocol"] = protocol
 
         manifest = {
             "apiVersion": "v1",
@@ -396,6 +404,8 @@ class Kubernetes(service.Service):
             }
         }
 
+        if labels:
+            manifest["metadata"]["labels"].update(labels)
         if not self._spec.get("serviceaccounts"):
             del manifest["spec"]["serviceAccountName"]
         if volume and volume.get("volume"):
@@ -1069,3 +1079,97 @@ class Kubernetes(service.Service):
                                    read_method=self.get_statefulset,
                                    resource_type="StatefulSet",
                                    namespace=namespace)
+
+    @atomic.action_timer("kubernetes.get_service")
+    def get_service(self, name, namespace):
+        return self.v1_client.read_namespaced_service(
+            name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_service")
+    def create_service(self, name, namespace, port, protocol, type,
+                       labels=None):
+        """Create service with some type, port and protocol.
+
+        :param name: service name
+        :param namespace: service namespace
+        :param port: service port
+        :param protocol: service port protocol
+        :param type: service type, e.g. ClusterIP or NodePort
+        :param labels: labels for service selector
+        """
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": name,
+                "labels": labels
+            },
+            "spec": {
+                "type": type,
+                "ports": [
+                    {
+                        "port": port,
+                        "protocol": protocol
+                    }
+                ],
+                "selector": labels
+            }
+        }
+
+        self.v1_client.create_namespaced_service(
+            namespace=namespace,
+            body=manifest
+        )
+
+    @atomic.action_timer("kubernetes.get_endpoints")
+    def get_endpoints(self, name, namespace):
+        return self.v1_client.read_namespaced_endpoints(
+            name=name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_endpoints")
+    def create_endpoints(self, name, namespace, ip, port):
+        manifest = {
+            "apiVersion": "v1",
+            "kind": "Endpoints",
+            "metadata": {
+                "name": name
+            },
+            "subsets": [
+                {
+                    "addresses": [
+                        {
+                            "ip": ip
+                        }
+                    ],
+                    "ports": [
+                        {
+                            "port": port
+                        }
+                    ]
+                }
+            ]
+        }
+        self.v1_client.create_namespaced_endpoints(
+            namespace=namespace,
+            body=manifest
+        )
+
+    @atomic.action_timer("kubernetes.delete_endpoints")
+    def delete_endpoints(self, name, namespace):
+        self.v1_client.delete_namespaced_endpoints(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+    @atomic.action_timer("kubernetes.delete_service")
+    def delete_service(self, name, namespace):
+        self.v1_client.delete_namespaced_service(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )

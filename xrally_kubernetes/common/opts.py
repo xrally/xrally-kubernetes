@@ -17,7 +17,7 @@ from rally.common import cfg
 
 KUBERNETES_OPTS = [
     cfg.FloatOpt("start_prepoll_delay",
-                 default=0.0,
+                 default=0.5,
                  help="Time to sleep before polling for status"),
     cfg.IntOpt("status_total_retries",
                default=60,
