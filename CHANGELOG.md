@@ -37,6 +37,8 @@
 * [scenario plugin] Kubernetes.create_and_delete_deployment
 * [scenario plugin] Kubernetes.create_rollout_and_delete_deployment
 * [scenario plugin] Kubernetes.create_and_delete_job
+* [scenario plugin] Kubernetes.create_and_delete_statefulset
+* [scenario plugin] Kubernetes.create_scale_and_delete_statefulset
 
 ## [1.0.0] - 2018-06-26
 

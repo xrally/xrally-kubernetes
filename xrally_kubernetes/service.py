@@ -16,6 +16,7 @@ import re
 
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
+from kubernetes.client.apis import apps_v1_api
 from kubernetes.client.apis import batch_v1_api
 from kubernetes.client.apis import core_v1_api
 from kubernetes.client.apis import extensions_v1beta1_api
@@ -199,6 +200,7 @@ class Kubernetes(service.Service):
         self.v1_client = core_v1_api.CoreV1Api(api)
         self.v1beta1_ext = extensions_v1beta1_api.ExtensionsV1beta1Api(api)
         self.v1_batch = batch_v1_api.BatchV1Api(api)
+        self.v1_apps = apps_v1_api.AppsV1Api(api)
 
     def get_version(self):
         return version_api.VersionApi(self.api).get_code().to_dict()
@@ -942,3 +944,128 @@ class Kubernetes(service.Service):
                                    resource_type="Job",
                                    namespace=namespace,
                                    active=True)
+
+    @atomic.action_timer("kubernetes.get_statefulset")
+    def get_statefulset(self, name, namespace):
+        return self.v1_apps.read_namespaced_stateful_set(
+            name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_statefulset")
+    def create_statefulset(self, namespace, replicas, image, command=None,
+                           status_wait=True):
+        """Create statefulset and optionally wait for ready replicas.
+
+        :param namespace: statefulset namespace
+        :param replicas: statefulset number of replicas
+        :param image: container's template image
+        :param command: container's template array of strings command
+        :param status_wait: wait for ready replicas if True
+        """
+        app = self.generate_random_name()
+        name = self.generate_random_name()
+
+        container_spec = {
+            "name": name,
+            "image": image
+        }
+        if command is not None and isinstance(command, (list, tuple)):
+            container_spec["command"] = list(command)
+
+        manifest = {
+            "apiVersion": "apps/v1",
+            "kind": "StatefulSet",
+            "metadata": {
+                "name": name,
+                "labels": {
+                    "app": app
+                }
+            },
+            "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": app
+                    }
+                },
+                "replicas": replicas,
+                "template": {
+                    "metadata": {
+                        "name": name,
+                        "labels": {
+                            "app": app
+                        }
+                    },
+                    "spec": {
+                        "serviceAccountName": namespace,
+                        "containers": [container_spec]
+                    }
+                }
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["template"]["spec"]["serviceAccountName"]
+
+        self.v1_apps.create_namespaced_stateful_set(
+            namespace=namespace,
+            body=manifest
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_statefulset_for_ready_replicas"):
+                wait_for_ready_replicas(name,
+                                        read_method=self.get_statefulset,
+                                        resource_type="StatefulSet",
+                                        namespace=namespace)
+        return name
+
+    @atomic.action_timer("kubernetes.scale_statefulset")
+    def scale_statefulset(self, name, namespace, replicas,
+                          status_wait=True):
+        """Scale statefulset to scale_replicas and optionally wait for status.
+
+        :param name: statefulset name
+        :param namespace: statefulset namespace
+        :param replicas: statefulset replicas scale to
+        :param status_wait: wait for ready scaling if True
+        """
+        self.v1_apps.patch_namespaced_stateful_set(
+            name,
+            namespace=namespace,
+            body={"spec": {"replicas": replicas}}
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_statefulset_for_ready_replicas"):
+                wait_for_ready_replicas(name,
+                                        read_method=self.get_statefulset,
+                                        resource_type="StatefulSet",
+                                        namespace=namespace)
+
+    @atomic.action_timer("kubernetes.delete_statefulset")
+    def delete_statefulset(self, name, namespace, status_wait=True):
+        """Delete statefulset and optionally wait for termination.
+
+        :param name: statefulset name
+        :param namespace: statefulset namespace
+        :param status_wait: wait for ready scaling if True
+        """
+        self.v1_apps.delete_namespaced_stateful_set(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_statefulset_for_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_statefulset,
+                                   resource_type="StatefulSet",
+                                   namespace=namespace)
