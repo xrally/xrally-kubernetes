@@ -36,6 +36,7 @@
 * [scenario plugin] Kubernetes.create_check_and_delete_pod_with_secret_volume
 * [scenario plugin] Kubernetes.create_and_delete_deployment
 * [scenario plugin] Kubernetes.create_rollout_and_delete_deployment
+* [scenario plugin] Kubernetes.create_and_delete_job
 
 ## [1.0.0] - 2018-06-26
 

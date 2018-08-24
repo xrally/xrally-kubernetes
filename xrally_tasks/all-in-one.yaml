@@ -239,3 +239,19 @@ subtasks:
     namespaces:
       count: 3
       with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete job
+  scenario:
+    Kubernetes.create_and_delete_job:
+      image: busybox
+      command:
+      - echo
+      - "SUCCESS"
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
