@@ -39,6 +39,8 @@
 * [scenario plugin] Kubernetes.create_and_delete_job
 * [scenario plugin] Kubernetes.create_and_delete_statefulset
 * [scenario plugin] Kubernetes.create_scale_and_delete_statefulset
+* [scenario plugin] Kubernetes.create_check_and_delete_pod_with_cluster_ip_service
+* [scenario plugin] Kubernetes.create_check_and_delete_pod_with_node_port_service
 
 ## [1.0.0] - 2018-06-26
 
