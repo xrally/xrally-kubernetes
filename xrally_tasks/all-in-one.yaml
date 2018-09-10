@@ -438,6 +438,7 @@ subtasks:
       image: gcr.io/google-samples/hello-go-gke:1.0
       port: 80
       protocol: TCP
+      request_timeout: 10
   runner:
     constant:
       concurrency: 2
