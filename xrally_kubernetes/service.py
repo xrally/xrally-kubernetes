@@ -387,7 +387,10 @@ class Kubernetes(service.Service):
             "name": name,
             "image": image
         }
-        if command is not None and isinstance(command, (list, tuple)):
+        if command is not None:
+            if not isinstance(command, (list, tuple)):
+                raise ValueError("'command' argument should be list or tuple "
+                                 "type, found %s" % type(command))
             container_spec["command"] = list(command)
         if volume and volume.get("mount_path"):
             container_spec["volumeMounts"] = volume["mount_path"]
@@ -504,7 +507,10 @@ class Kubernetes(service.Service):
             "name": name,
             "image": image
         }
-        if command is not None and isinstance(command, (list, tuple)):
+        if command is not None:
+            if not isinstance(command, (list, tuple)):
+                raise ValueError("'command' argument should be list or tuple "
+                                 "type, found %s" % type(command))
             container_spec["command"] = list(command)
 
         manifest = {
@@ -626,7 +632,10 @@ class Kubernetes(service.Service):
             "name": name,
             "image": image
         }
-        if command is not None and isinstance(command, (list, tuple)):
+        if command is not None:
+            if not isinstance(command, (list, tuple)):
+                raise ValueError("'command' argument should be list or tuple "
+                                 "type, found %s" % type(command))
             container_spec["command"] = list(command)
 
         manifest = {
@@ -745,11 +754,20 @@ class Kubernetes(service.Service):
             "name": name,
             "image": image
         }
-        if command is not None and isinstance(command, (list, tuple)):
+        if command is not None:
+            if not isinstance(command, (list, tuple)):
+                raise ValueError("'command' argument should be list or tuple "
+                                 "type, found %s" % type(command))
             container_spec["command"] = list(command)
-        if env is not None and isinstance(env, (list, tuple)):
+        if env is not None:
+            if not isinstance(env, (list, tuple)):
+                raise ValueError("'env' argument should be list or tuple "
+                                 "type, found %s" % type(env))
             container_spec["env"] = list(env)
-        if resources is not None and isinstance(resources, dict):
+        if resources is not None:
+            if not isinstance(resources, dict):
+                raise ValueError("'resources' argument should be dict type, "
+                                 "found %s" % type(resources))
             container_spec["resources"] = resources
 
         manifest = {
@@ -912,6 +930,10 @@ class Kubernetes(service.Service):
         """
         name = name or self.generate_random_name()
 
+        if not isinstance(command, (list, tuple)):
+            raise ValueError("'command' argument should be list or tuple "
+                             "type, found %s" % type(command))
+
         manifest = {
             "apiVersion": "batch/v1",
             "kind": "Job",
@@ -1019,7 +1041,10 @@ class Kubernetes(service.Service):
             "name": name,
             "image": image
         }
-        if command is not None and isinstance(command, (list, tuple)):
+        if command is not None:
+            if not isinstance(command, (list, tuple)):
+                raise ValueError("'command' argument should be list or tuple "
+                                 "type, found %s" % type(command))
             container_spec["command"] = list(command)
 
         manifest = {
@@ -1163,7 +1188,10 @@ class Kubernetes(service.Service):
             "name": name,
             "image": image
         }
-        if command is not None and isinstance(command, (list, tuple)):
+        if command is not None:
+            if not isinstance(command, (list, tuple)):
+                raise ValueError("'command' argument should be list or tuple "
+                                 "type, found %s" % type(command))
             container_spec["command"] = list(command)
 
         manifest = {
