@@ -130,6 +130,8 @@ def wait_for_not_found(name, read_method, resource_type=None, **kwargs):
                 current_status = "%s replicas" % resp.status.replicas
             elif kwargs.get("active"):
                 current_status = resp.status.active
+            elif kwargs.get("daemonset"):
+                current_status = "%s pods" % resp.status.number_available
             elif hasattr(resp.status, "phase"):
                 current_status = resp.status.phase
             else:
@@ -1116,6 +1118,155 @@ class Kubernetes(service.Service):
                                    read_method=self.get_statefulset,
                                    resource_type="StatefulSet",
                                    namespace=namespace)
+
+    @atomic.action_timer("kubernetes.list_nodes")
+    def list_nodes(self, node_labels=None):
+        """Return list of optionally filtered nodes names.
+
+        :param node_labels: map, each key is a label name with some value
+        """
+        node_meta = [node.metadata
+                     for node in self.v1_client.list_node().items]
+        if node_labels is None:
+            return [meta.name for meta in node_meta]
+
+        node_names = []
+        for meta in node_meta:
+            for k, v in meta.labels.items():
+                if k in node_labels and node_labels[k] == v:
+                    node_names.append(meta.name)
+        return node_names
+
+    @atomic.action_timer("kubernetes.get_daemonset")
+    def get_daemonset(self, name, namespace, **kwargs):
+        return self.v1beta1_ext.read_namespaced_daemon_set(
+            name,
+            namespace=namespace
+        )
+
+    @atomic.action_timer("kubernetes.create_daemonset")
+    def create_daemonset(self, image, namespace, command=None,
+                         node_labels=None, status_wait=True):
+        """Create daemon set and optionally wait for status.
+
+        :param namespace: daemon set namespace
+        :param image: daemon set template image
+        :param command: daemon set template command
+        :param node_labels: map, each key is a label name with some value
+        :param status_wait: wait for status if True
+        :return: name and app
+        """
+        name = self.generate_random_name()
+        app = self.generate_random_name()
+
+        container_spec = {
+            "name": name,
+            "image": image
+        }
+        if command is not None and isinstance(command, (list, tuple)):
+            container_spec["command"] = list(command)
+
+        manifest = {
+            "apiVersion": "extensions/v1beta1",
+            "kind": "DaemonSet",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "name": name,
+                        "labels": {
+                            "app": app
+                        }
+                    },
+                    "spec": {
+                        "serviceAccountName": namespace,
+                        "containers": [container_spec]
+                    }
+                }
+            }
+        }
+
+        if not self._spec.get("serviceaccounts"):
+            del manifest["spec"]["template"]["spec"]["serviceAccountName"]
+
+        self.v1beta1_ext.create_namespaced_daemon_set(
+            namespace=namespace,
+            body=manifest
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_for_daemonset_ready_pods"):
+                sleep_time = CONF.kubernetes.status_poll_interval
+                retries_total = CONF.kubernetes.status_total_retries
+
+                commonutils.interruptable_sleep(
+                    CONF.kubernetes.start_prepoll_delay)
+
+                i = 0
+                while i < retries_total:
+                    resp = self.get_daemonset(name=name, namespace=namespace)
+                    resp_id = resp.metadata.uid
+                    current_status = resp.status.number_ready
+                    nodes_total = len(self.list_nodes(node_labels))
+                    if current_status != nodes_total:
+                        i += 1
+                        commonutils.interruptable_sleep(sleep_time)
+                    else:
+                        break
+                    if i == retries_total:
+                        raise exceptions.TimeoutException(
+                            desired_status="%s pods" % nodes_total,
+                            resource_name=name,
+                            resource_type="DaemonSet",
+                            resource_id=resp_id or "<no id>",
+                            resource_status="%s pods" % current_status,
+                            timeout=(retries_total * sleep_time))
+        return name, app
+
+    @atomic.action_timer("kubernetes.check_daemonset_pods")
+    def check_daemonset(self, namespace, app, node_labels=None):
+        node_names = self.list_nodes(node_labels)
+
+        pods = self.v1_client.list_namespaced_pod(
+            namespace=namespace,
+            label_selector="app=%s" % app
+        )
+        pods_nodes = set()
+        for pod in pods.items:
+            pods_nodes.add(pod.spec.node_name)
+
+        if set(node_names).symmetric_difference(pods_nodes):
+            raise exceptions.RallyException(
+                message="DaemonSet check failed: number of selected nodes not "
+                        "equals to number of daemonSet pods")
+
+    @atomic.action_timer("kubernetes.delete_daemonset")
+    def delete_daemonset(self, name, namespace, status_wait=True):
+        """Delete daemon set and optionally wait for termination.
+
+        :param name: daemon set name
+        :param namespace: daemon set namespace
+        :param status_wait: wait for termination if True
+        """
+        self.v1beta1_ext.delete_namespaced_daemon_set(
+            name,
+            namespace=namespace,
+            body=k8s_config.V1DeleteOptions()
+        )
+
+        if status_wait:
+            with atomic.ActionTimer(
+                    self,
+                    "kubernetes.wait_daemonset_for_termination"):
+                wait_for_not_found(name,
+                                   read_method=self.get_daemonset,
+                                   resource_type="DaemonSet",
+                                   namespace=namespace,
+                                   daemonset=True)
 
     @atomic.action_timer("kubernetes.get_service")
     def get_service(self, name, namespace):
