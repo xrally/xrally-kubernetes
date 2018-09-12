@@ -547,33 +547,20 @@ class PodTestCase(KubernetesServiceTestCase):
 
         self.k8s_client.generate_random_name = mock.MagicMock()
         self.k8s_client.generate_random_name.return_value = "name"
-        self.k8s_client.create_pod(
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_pod,
             image="test/image",
             namespace="ns",
             command="ls",
-            status_wait=False)
+            status_wait=False
+        )
 
-        expected = {
-            "apiVersion": "v1",
-            "kind": "Pod",
-            "metadata": {
-                "name": "name",
-                "labels": {
-                    "role": "name"
-                }
-            },
-            "spec": {
-                "containers": [
-                    {
-                        "name": "name",
-                        "image": "test/image"
-                    }
-                ]
-            }
-        }
-        self.client.create_namespaced_pod.assert_called_once_with(
-            body=expected,
-            namespace="ns"
+        self.assertEqual("'command' argument should be list or tuple type, "
+                         "found %s" % type("ls"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_pod.call_count
         )
 
     def test_create_pod_with_sa(self):
@@ -892,47 +879,22 @@ class ReplicationControllerTestCase(KubernetesServiceTestCase):
 
         self.k8s_client.generate_random_name = mock.MagicMock()
         self.k8s_client.generate_random_name.return_value = "name"
-        self.k8s_client.create_rc(
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_rc,
             image="test/image",
             replicas=2,
             namespace="ns",
             command="ls",
-            status_wait=False)
+            status_wait=False
+        )
 
-        expected = {
-            "apiVersion": "v1",
-            "kind": "ReplicationController",
-            "metadata": {
-                "name": "name",
-            },
-            "spec": {
-                "replicas": 2,
-                "selector": {
-                    "app": mock.ANY
-                },
-                "template": {
-                    "metadata": {
-                        "name": "name",
-                        "labels": {
-                            "app": mock.ANY
-                        }
-                    },
-                    "spec": {
-                        "containers": [
-                            {
-                                "name": "name",
-                                "image": "test/image"
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-        (self.client.create_namespaced_replication_controller
-            .assert_called_once_with(
-                body=expected,
-                namespace="ns"
-            ))
+        self.assertEqual("'command' argument should be list or tuple type, "
+                         "found %s" % type("ls"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_replication_controller.call_count
+        )
 
     def test_create_and_wait_replication_controller_success(self):
         self.config_cls.reset_mock()
@@ -1262,52 +1224,22 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
 
         self.k8s_client.generate_random_name = mock.MagicMock()
         self.k8s_client.generate_random_name.return_value = "name"
-        self.k8s_client.create_replicaset(
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_replicaset,
             image="test/image",
             replicas=2,
             namespace="ns",
             command="ls",
-            status_wait=False)
+            status_wait=False
+        )
 
-        expected = {
-            "apiVersion": "extensions/v1beta1",
-            "kind": "ReplicaSet",
-            "metadata": {
-                "name": "name",
-                "labels": {
-                    "app": mock.ANY
-                }
-            },
-            "spec": {
-                "replicas": 2,
-                "selector": {
-                    "matchLabels": {
-                        "app": mock.ANY
-                    }
-                },
-                "template": {
-                    "metadata": {
-                        "name": "name",
-                        "labels": {
-                            "app": mock.ANY
-                        }
-                    },
-                    "spec": {
-                        "containers": [
-                            {
-                                "name": "name",
-                                "image": "test/image"
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-        (self.client.create_namespaced_replica_set
-            .assert_called_once_with(
-                body=expected,
-                namespace="ns"
-            ))
+        self.assertEqual("'command' argument should be list or tuple type, "
+                         "found %s" % type("ls"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_replica_set.call_count
+        )
 
     def test_create_and_wait_replicaset_success(self):
         self.config_cls.reset_mock()
@@ -2022,47 +1954,72 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
 
         self.k8s_client.generate_random_name = mock.MagicMock()
         self.k8s_client.generate_random_name.return_value = "name"
-        self.k8s_client.create_deployment(
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_deployment,
             image="test/image",
             replicas=2,
             namespace="ns",
             command="ls",
-            status_wait=False)
+            status_wait=False
+        )
 
-        expected = {
-            "apiVersion": "extensions/v1beta1",
-            "kind": "Deployment",
-            "metadata": {
-                "name": "name",
-                "labels": {
-                    "app": mock.ANY
-                }
-            },
-            "spec": {
-                "replicas": 2,
-                "template": {
-                    "metadata": {
-                        "name": "name",
-                        "labels": {
-                            "app": mock.ANY
-                        }
-                    },
-                    "spec": {
-                        "containers": [
-                            {
-                                "name": "name",
-                                "image": "test/image"
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-        (self.client.create_namespaced_deployment
-            .assert_called_once_with(
-                body=expected,
-                namespace="ns"
-            ))
+        self.assertEqual("'command' argument should be list or tuple type, "
+                         "found %s" % type("ls"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_deployment.call_count
+        )
+
+    def test_create_deployment_with_incorrect_env(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_deployment,
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command=["ls"],
+            env="VAR",
+            status_wait=False
+        )
+
+        self.assertEqual("'env' argument should be list or tuple type, "
+                         "found %s" % type("VAR"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_deployment.call_count
+        )
+
+    def test_create_deployment_with_incorrect_resources(self):
+        self.config_cls.reset_mock()
+        self.api_cls.reset_mock()
+        self.client_cls.reset_mock()
+
+        self.k8s_client.generate_random_name = mock.MagicMock()
+        self.k8s_client.generate_random_name.return_value = "name"
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_deployment,
+            image="test/image",
+            replicas=2,
+            namespace="ns",
+            command=["ls"],
+            resources=("limit", "unlimited"),
+            status_wait=False
+        )
+
+        self.assertEqual("'resources' argument should be dict type, found "
+                         "%s" % type(("limit", "unlimited")), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_deployment.call_count
+        )
 
     def test_create_and_wait_deployment_success(self):
         self.config_cls.reset_mock()
@@ -2626,52 +2583,22 @@ class StatefulSetServiceTestCase(KubernetesServiceTestCase):
 
         self.k8s_client.generate_random_name = mock.MagicMock()
         self.k8s_client.generate_random_name.return_value = "name"
-        self.k8s_client.create_statefulset(
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_statefulset,
             image="test/image",
             replicas=2,
             namespace="ns",
             command="ls",
-            status_wait=False)
+            status_wait=False
+        )
 
-        expected = {
-            "apiVersion": "apps/v1",
-            "kind": "StatefulSet",
-            "metadata": {
-                "name": "name",
-                "labels": {
-                    "app": mock.ANY
-                }
-            },
-            "spec": {
-                "selector": {
-                    "matchLabels": {
-                        "app": mock.ANY
-                    }
-                },
-                "replicas": 2,
-                "template": {
-                    "metadata": {
-                        "name": "name",
-                        "labels": {
-                            "app": mock.ANY
-                        }
-                    },
-                    "spec": {
-                        "containers": [
-                            {
-                                "image": "test/image",
-                                "name": "name"
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-        (self.client.create_namespaced_stateful_set
-            .assert_called_once_with(
-                body=expected,
-                namespace="ns"
-            ))
+        self.assertEqual("'command' argument should be list or tuple type, "
+                         "found %s" % type("ls"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_stateful_set.call_count
+        )
 
     def test_create_and_wait_statefulset_success(self):
         self.config_cls.reset_mock()
@@ -3349,43 +3276,21 @@ class DaemonSetServiceTestCase(KubernetesServiceTestCase):
 
         self.k8s_client.generate_random_name = mock.MagicMock()
         self.k8s_client.generate_random_name.return_value = "name"
-        self.k8s_client.create_daemonset(
+        ex = self.assertRaises(
+            ValueError,
+            self.k8s_client.create_daemonset,
             image="test/image",
             namespace="ns",
             command="ls",
             node_labels=None,
-            status_wait=False)
-
-        expected = expected = {
-            "apiVersion": "extensions/v1beta1",
-            "kind": "DaemonSet",
-            "metadata": {
-                "name": "name"
-            },
-            "spec": {
-                "template": {
-                    "metadata": {
-                        "name": "name",
-                        "labels": {
-                            "app": mock.ANY
-                        }
-                    },
-                    "spec": {
-                        "containers": [
-                            {
-                                "image": "test/image",
-                                "name": "name"
-                            }
-                        ]
-                    }
-                }
-            }
-        }
-        (self.client.create_namespaced_daemon_set
-            .assert_called_once_with(
-                body=expected,
-                namespace="ns"
-            ))
+            status_wait=False
+        )
+        self.assertEqual("'command' argument should be list or tuple type, "
+                         "found %s" % type("ls"), str(ex))
+        self.assertEqual(
+            0,
+            self.client.create_namespaced_daemon_set.call_count
+        )
 
     def test_create_and_wait_daemonset_success_node_no_filter(self):
         self.config_cls.reset_mock()
