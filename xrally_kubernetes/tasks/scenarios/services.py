@@ -122,12 +122,14 @@ class PodWithClusterIPSvc(common_scenario.BaseKubernetesScenario):
 )
 class PodWithNodePortService(common_scenario.BaseKubernetesScenario):
 
-    def run(self, image, port, protocol, command=None, status_wait=True):
+    def run(self, image, port, protocol, request_timeout=None,
+            command=None, status_wait=True):
         """Create pod and nodePort svc, request pod by port and delete then.
 
         :param image: pod's image
         :param port: pod's container port and svc port integer
         :param protocol: pod's container port and svc port protocol
+        :param request_timeout: check request timeout
         :param command: pod's array of strings representing command
         :param status_wait: wait for pod status if True
         """
@@ -171,8 +173,11 @@ class PodWithNodePortService(common_scenario.BaseKubernetesScenario):
                    str(node_port) + "/")
             while i < retries_total:
                 try:
-                    requests.get(url)
-                except requests.ConnectionError as ex:
+                    kwargs = {}
+                    if request_timeout:
+                        kwargs["timeout"] = request_timeout
+                    requests.get(url, **kwargs)
+                except (requests.ConnectionError, requests.ReadTimeout) as ex:
                     if i < retries_total:
                         i += 1
                         commonutils.interruptable_sleep(sleep_time)
