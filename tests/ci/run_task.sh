@@ -37,4 +37,4 @@ rally env create --name test_env --spec $SPEC_FILE
 rally env info
 
 # Run actual task
-rally task start "$XRALLY_TASK"
+rally --rally-debug task start "$XRALLY_TASK"

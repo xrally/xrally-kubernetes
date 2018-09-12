@@ -173,7 +173,7 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
   contexts:
     namespaces:
       count: 3
@@ -196,7 +196,266 @@ subtasks:
   runner:
     constant:
       concurrency: 2
-      times: 10
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete pod with configMap volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_configmap_volume:
+      image: busybox
+      command:
+      - "sleep"
+      - "3600"
+      mount_path: /var/log/check.txt
+      subpath: check.txt
+      configmap_data:
+        check.txt: |
+          test
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/check/delete pod with configMap volume
+  scenario:
+    Kubernetes.create_and_delete_pod_with_configmap_volume:
+      image: busybox
+      command:
+      - "sleep"
+      - "3600"
+      mount_path: /var/log/check.txt
+      subpath: check.txt
+      configmap_data:
+        check.txt: |
+          test
+      check_cmd:
+      - cat
+      - /var/log/check.txt
+      error_regexp: No such file
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete pod with local PVC
+  scenario:
+    Kubernetes.create_and_delete_pod_with_local_persistent_volume:
+      persistent_volume:
+        size: 1Gi
+        volume_mode: Block
+        local_path: /var/tmp
+        access_modes:
+        - ReadWriteOnce
+        node_affinity:
+          required:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      persistent_volume_claim:
+        size: 250Mi
+        access_modes:
+        - ReadWriteOnce
+      image: gcr.io/google-samples/hello-go-gke:1.0
+      mount_path: /opt/check
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+    local_storageclass: {}
+
+- title: Run a single workload with create/read/check/delete pod with local PVC
+  scenario:
+    Kubernetes.create_and_delete_pod_with_local_persistent_volume:
+      persistent_volume:
+        size: 1Gi
+        volume_mode: Block
+        local_path: /var/tmp
+        access_modes:
+        - ReadWriteOnce
+        node_affinity:
+          required:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      persistent_volume_claim:
+        size: 250Mi
+        access_modes:
+        - ReadWriteOnce
+      image: gcr.io/google-samples/hello-go-gke:1.0
+      mount_path: /opt/check
+      check_cmd:
+      - ls
+      - /opt/check
+      error_regexp: No such file
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+    local_storageclass: {}
+
+- title: Run a single workload with create/read/delete deployment
+  scenario:
+    Kubernetes.create_and_delete_deployment:
+      image: kubernetes/pause
+      replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/rollout/delete deployment
+  scenario:
+    Kubernetes.create_rollout_and_delete_deployment:
+      image: busybox
+      replicas: 1
+      command:
+      - sleep
+      - "3600"
+      env:
+      - name: "UPD"
+        value: "false"
+      changes:
+        env:
+        - name: "UPD"
+          value: "true"
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete statefulset
+  scenario:
+    Kubernetes.create_and_delete_statefulset:
+      image: kubernetes/pause
+      replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/scale/delete statefulset
+  scenario:
+    Kubernetes.create_scale_and_delete_statefulset:
+      image: kubernetes/pause
+      replicas: 1
+      scale_replicas: 2
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/read/delete job
+  scenario:
+    Kubernetes.create_and_delete_job:
+      image: busybox
+      command:
+      - echo
+      - "SUCCESS"
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/check/delete clusterIP service
+  scenario:
+    Kubernetes.create_check_and_delete_pod_with_cluster_ip_service:
+      image: gcr.io/google-samples/hello-go-gke:1.0
+      port: 80
+      protocol: TCP
+  runner:
+    constant:
+      concurrency: 2
+      times: 2
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/check/delete daemonset
+  scenario:
+    Kubernetes.create_check_and_delete_daemonset:
+      image: kubernetes/pause
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/check/delete clusterIP service with custom endpoint
+  scenario:
+    Kubernetes.create_check_and_delete_pod_with_cluster_ip_service:
+      image: gcr.io/google-samples/hello-go-gke:1.0
+      port: 80
+      protocol: TCP
+      custom_endpoint: true
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
+  contexts:
+    namespaces:
+      count: 3
+      with_serviceaccount: true
+
+- title: Run a single workload with create/check/delete NodePort service
+  scenario:
+    Kubernetes.create_check_and_delete_pod_with_node_port_service:
+      image: gcr.io/google-samples/hello-go-gke:1.0
+      port: 80
+      protocol: TCP
+      request_timeout: 10
+  runner:
+    constant:
+      concurrency: 2
+      times: 4
   contexts:
     namespaces:
       count: 3

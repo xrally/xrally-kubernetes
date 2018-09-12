@@ -17,10 +17,10 @@ from rally.common import cfg
 
 KUBERNETES_OPTS = [
     cfg.FloatOpt("start_prepoll_delay",
-                 default=0.0,
+                 default=1,
                  help="Time to sleep before polling for status"),
     cfg.IntOpt("status_total_retries",
-               default=60,
+               default=100,
                help="Kubernetes total retries to read resource status"),
     cfg.FloatOpt("status_poll_interval",
                  default=1.0,

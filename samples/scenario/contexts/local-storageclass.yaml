@@ -1,0 +1,13 @@
+---
+version: 2
+title: Check listing namespaces with local storageClass created in context
+subtasks:
+- title: Run a single workload with listing existing kubernetes namespaces
+  scenario:
+    Kubernetes.list_namespaces: {}
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    local_storageclass: {}

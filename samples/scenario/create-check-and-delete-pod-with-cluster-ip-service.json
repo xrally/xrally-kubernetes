@@ -1,0 +1,50 @@
+{
+  "version": 2,
+  "title": "Create pod, create clusterIP service, check service with curl job and delete them all then",
+  "subtasks": [
+    {
+      "title": "Run a single workload with create/check/delete clusterIP service",
+      "scenario": {
+        "Kubernetes.create_check_and_delete_pod_with_cluster_ip_service": {
+          "image": "gcr.io/google-samples/hello-go-gke:1.0",
+          "port": 80,
+          "protocol": "TCP"
+        }
+      },
+      "runner": {
+        "constant": {
+          "concurrency": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    },
+    {
+      "title": "Run create/check/delete clusterIP service with rps runner",
+      "scenario": {
+        "Kubernetes.create_check_and_delete_pod_with_cluster_ip_service": {
+          "image": "gcr.io/google-samples/hello-go-gke:1.0",
+          "port": 80,
+          "protocol": "TCP"
+        }
+      },
+      "runner": {
+        "rps": {
+          "rps": 2,
+          "times": 10
+        }
+      },
+      "contexts": {
+        "namespaces": {
+          "count": 3,
+          "with_serviceaccount": true
+        }
+      }
+    }
+  ]
+}
