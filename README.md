@@ -2,10 +2,6 @@
 
 xRally plugins for [Kubernetes](https://kubernetes.io/) platform.
 
-## Status ot this package
-
-Work in progress. The active phase of development.
-
 ## Getting started
 
 First of all, you need to create rally env for Kubernetes. There are two main
