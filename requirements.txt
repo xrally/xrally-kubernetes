@@ -11,6 +11,6 @@ setuptools-scm                                     # MIT
 #   'urllib3' from the other package.
 requests                                           # Apache License Version 2.0
 
-rally>=0.11.0
+rally>=1.2.0
 
 kubernetes>=5.0.0                                   # Apache License Version 2.0
