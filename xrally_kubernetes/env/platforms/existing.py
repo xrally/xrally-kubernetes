@@ -45,7 +45,11 @@ class KubernetesPlatform(platform.Platform):
                     "api_key_prefix": {
                         "type": "string",
                         "description": "API key prefix. Defaults to 'Bearer'."
-                    }
+                    },
+                    "description": {
+                        "type": "object",
+                        "description": "Kubernetes host optional description"
+                    },
                 },
                 "required": ["server", "certificate-authority", "api_key"],
                 "additionalProperties": False
@@ -73,6 +77,10 @@ class KubernetesPlatform(platform.Platform):
                         "type": "boolean",
                         "description": "Whether skip or not tls verification. "
                                        "Defaults to False."
+                    },
+                    "description": {
+                        "type": "object",
+                        "description": "Kubernetes host optional description"
                     },
                 },
                 "required": ["server", "certificate-authority",
