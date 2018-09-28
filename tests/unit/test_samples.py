@@ -25,6 +25,7 @@ from rally.env import env_mgr
 from rally.task import context
 from rally.task import engine
 from rally.task import scenario
+from rally.task import task_cfg
 
 from tests.unit import test
 import xrally_kubernetes
@@ -144,7 +145,7 @@ class TaskSampleTestCase(SamplesTestCase):
                         task_template = self.rapi.task.render_template(
                             task_template=task_file.read())
                         task_config = yaml.safe_load(task_template)
-                        task_config = engine.TaskConfig(task_config)
+                        task_config = task_cfg.TaskConfig(task_config)
                     except Exception:
                         print(traceback.format_exc())
                         self.fail("Invalid JSON file: %s" % path)
