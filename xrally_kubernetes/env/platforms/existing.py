@@ -17,9 +17,12 @@ import shutil
 import traceback
 import uuid
 
+from rally.common import cfg
 from rally.env import platform
 
 from xrally_kubernetes import service as k8s_service
+
+CONF = cfg.CONF
 
 
 @platform.configure(name="existing", platform="kubernetes")
@@ -153,7 +156,7 @@ class KubernetesPlatform(platform.Platform):
         :param ccert: client certificate file
         :param ckey: client key file
         """
-        certs = os.path.abspath(os.path.expanduser("~/.rally/certs"))
+        certs = os.path.abspath(os.path.expanduser(CONF.kubernetes.cert_dir))
         if not os.path.exists(certs):
             os.makedirs(certs)
 
