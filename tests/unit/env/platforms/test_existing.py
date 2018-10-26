@@ -92,22 +92,24 @@ class KubernetesPlatformTestCase(test.TestCase):
 
 class KubernetesPlatformFromSysEnvTestCase(test.TestCase):
 
-    def test_cert_vars(self):
+    @mock.patch.object(existing.KubernetesPlatform, '_create_cert_files')
+    def test_cert_vars(self, mock_create):
+        mock_create.return_value = {
+            "cert_auth": "new-stub.crt",
+            "ccert": "new-client-stub.crt",
+            "ckey": "new-client-stub.key"
+        }
         sys_env = {
             "KUBERNETES_CERT_AUTH": "stub.crt",
             "KUBERNETES_HOST": "localhost:8443",
             "KUBERNETES_CLIENT_KEY": "client-stub.key",
             "KUBERNETES_CLIENT_CERT": "client-stub.crt"
         }
-
-        def expand_path(x):
-            return os.path.abspath(os.path.expanduser(x))
-
         expected = {
             "server": "localhost:8443",
-            "certificate-authority": expand_path("stub.crt"),
-            "client-certificate": expand_path("client-stub.crt"),
-            "client-key": expand_path("client-stub.key"),
+            "certificate-authority": "new-stub.crt",
+            "client-certificate": "new-client-stub.crt",
+            "client-key": "new-client-stub.key",
             "tls_insecure": False
         }
 
@@ -150,7 +152,13 @@ class KubernetesPlatformFromSysEnvTestCase(test.TestCase):
         self.assertTrue(res["available"])
         self.assertEqual(expected, res["spec"])
 
-    def test_all_vars(self):
+    @mock.patch.object(existing.KubernetesPlatform, '_create_cert_files')
+    def test_all_vars(self, mock_create):
+        mock_create.return_value = {
+            "cert_auth": "new-stub.crt",
+            "ccert": "new-client-stub.crt",
+            "ckey": "new-client-stub.key"
+        }
         sys_env = {
             "KUBERNETES_CERT_AUTH": "stub.crt",
             "KUBERNETES_HOST": "localhost:8443",
@@ -160,15 +168,11 @@ class KubernetesPlatformFromSysEnvTestCase(test.TestCase):
             "KUBERNETES_CLIENT_CERT": "client-stub.crt",
             "KUBERNETES_TLS_INSECURE": True
         }
-
-        def expand_path(x):
-            return os.path.abspath(os.path.expanduser(x))
-
         expected = {
             "server": "localhost:8443",
-            "certificate-authority": expand_path("stub.crt"),
-            "client-certificate": expand_path("client-stub.crt"),
-            "client-key": expand_path("client-stub.key"),
+            "certificate-authority": "new-stub.crt",
+            "client-certificate": "new-client-stub.crt",
+            "client-key": "new-client-stub.key",
             "tls_insecure": True
         }
 

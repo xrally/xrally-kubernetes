@@ -13,11 +13,16 @@
 #    under the License.
 
 import os
+import shutil
 import traceback
+import uuid
 
+from rally.common import cfg
 from rally.env import platform
 
 from xrally_kubernetes import service as k8s_service
+
+CONF = cfg.CONF
 
 
 @platform.configure(name="existing", platform="kubernetes")
@@ -122,6 +127,11 @@ class KubernetesPlatform(platform.Platform):
         return {"available": True}
 
     def cleanup(self, task_uuid=None):
+        for key in ("certificate-authority", "client-certificate",
+                    "client-key"):
+            if key in self.spec:
+                if os.path.exists(self.spec[key]):
+                    os.remove(self.spec[key])
         return {
             "message": "Coming soon!",
             "discovered": 0,
@@ -137,6 +147,32 @@ class KubernetesPlatform(platform.Platform):
     def info(self):
         version = k8s_service.Kubernetes(self.platform_data).get_version()
         return {"info": version}
+
+    @staticmethod
+    def _create_cert_files(cert_auth, ccert, ckey):
+        """Store certification key files
+
+        :param cert_auth: certificate authority file
+        :param ccert: client certificate file
+        :param ckey: client key file
+        """
+        certs = os.path.abspath(os.path.expanduser(CONF.kubernetes.cert_dir))
+        if not os.path.exists(certs):
+            os.makedirs(certs)
+
+        name_uuid = str(uuid.uuid4())
+        new_cert_auth = os.path.join(certs, name_uuid + "_cert_auth")
+        new_ccert = os.path.join(certs, name_uuid + "_ccert")
+        new_ckey = os.path.join(certs, name_uuid + "_ckey")
+        shutil.copyfile(cert_auth, new_cert_auth)
+        shutil.copyfile(ccert, new_ccert)
+        shutil.copyfile(ckey, new_ckey)
+
+        return {
+            "cert_auth": new_cert_auth,
+            "ccert": new_ccert,
+            "ckey": new_ckey
+        }
 
     @classmethod
     def _get_doc(cls):
@@ -220,13 +256,14 @@ class KubernetesPlatform(platform.Platform):
         if ckey and ccert:
             ckey = os.path.abspath(os.path.expanduser(ckey))
             ccert = os.path.abspath(os.path.expanduser(ccert))
+            cfiles = cls._create_cert_files(cert_auth, ccert, ckey)
             return {
                 "available": True,
                 "spec": {
                     "server": host,
-                    "certificate-authority": cert_auth,
-                    "client-certificate": ccert,
-                    "client-key": ckey,
+                    "certificate-authority": cfiles.get("cert_auth"),
+                    "client-certificate": cfiles.get("ccert"),
+                    "client-key": cfiles.get("ckey"),
                     "tls_insecure": tls_insecure
                 }
             }

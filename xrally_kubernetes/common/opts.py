@@ -24,7 +24,10 @@ KUBERNETES_OPTS = [
                help="Kubernetes total retries to read resource status"),
     cfg.FloatOpt("status_poll_interval",
                  default=1.0,
-                 help="Kubernetes status poll interval")
+                 help="Kubernetes status poll interval"),
+    cfg.StrOpt("cert_dir",
+               default="~/.rally/cert",
+               help="Directory for storing certification files")
 ]
 
 
