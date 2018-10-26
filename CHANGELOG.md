@@ -17,6 +17,13 @@
  
 -->
 
+## [1.1.1] - 2018-09-28
+
+**Fixed**
+
+An issue of displaying description of the package at [pypi.org](
+https://pypi.org/project/xrally-kubernetes/) 
+
 ## [1.1.0] - 2018-09-28
 
 **Added**
