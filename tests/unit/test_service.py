@@ -1101,10 +1101,9 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(ReplicaSetServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import extensions_v1beta1_api
+        from kubernetes.client.apis import apps_v1_api
 
-        p_mock_client = mock.patch.object(extensions_v1beta1_api,
-                                          "ExtensionsV1beta1Api")
+        p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()
         self.client = self.client_cls.return_value
         self.addCleanup(p_mock_client.stop)
@@ -1123,7 +1122,7 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
             status_wait=False)
 
         expected = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "ReplicaSet",
             "metadata": {
                 "name": "name",
@@ -1177,7 +1176,7 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
             status_wait=False)
 
         expected = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "ReplicaSet",
             "metadata": {
                 "name": "name",
@@ -1841,10 +1840,9 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(DeploymentServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import extensions_v1beta1_api
+        from kubernetes.client.apis import apps_v1_api
 
-        p_mock_client = mock.patch.object(extensions_v1beta1_api,
-                                          "ExtensionsV1beta1Api")
+        p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()
         self.client = self.client_cls.return_value
         self.addCleanup(p_mock_client.stop)
@@ -1863,7 +1861,7 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
             status_wait=False)
 
         expected = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "Deployment",
             "metadata": {
                 "name": "name",
@@ -1872,6 +1870,11 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
                 }
             },
             "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
                 "replicas": 2,
                 "template": {
                     "metadata": {
@@ -1912,7 +1915,7 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
             status_wait=False)
 
         expected = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "Deployment",
             "metadata": {
                 "name": "name",
@@ -1921,6 +1924,11 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
                 }
             },
             "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
                 "replicas": 2,
                 "template": {
                     "metadata": {
@@ -3165,11 +3173,10 @@ class DaemonSetServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(DaemonSetServiceTestCase, self).setUp()
 
+        from kubernetes.client.apis import apps_v1_api
         from kubernetes.client.apis import core_v1_api
-        from kubernetes.client.apis import extensions_v1beta1_api
 
-        p_mock_client = mock.patch.object(extensions_v1beta1_api,
-                                          "ExtensionsV1beta1Api")
+        p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()
         self.client = self.client_cls.return_value
         self.addCleanup(p_mock_client.stop)
@@ -3193,12 +3200,17 @@ class DaemonSetServiceTestCase(KubernetesServiceTestCase):
             status_wait=False)
 
         expected = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "DaemonSet",
             "metadata": {
                 "name": "name"
             },
             "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
                 "template": {
                     "metadata": {
                         "name": "name",
@@ -3238,12 +3250,17 @@ class DaemonSetServiceTestCase(KubernetesServiceTestCase):
             status_wait=False)
 
         expected = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "DaemonSet",
             "metadata": {
                 "name": "name"
             },
             "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": mock.ANY
+                    }
+                },
                 "template": {
                     "metadata": {
                         "name": "name",
