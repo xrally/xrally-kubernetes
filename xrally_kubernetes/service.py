@@ -19,7 +19,6 @@ from kubernetes.client import api_client
 from kubernetes.client.apis import apps_v1_api
 from kubernetes.client.apis import batch_v1_api
 from kubernetes.client.apis import core_v1_api
-from kubernetes.client.apis import extensions_v1beta1_api
 from kubernetes.client.apis import storage_v1_api
 from kubernetes.client.apis import version_api
 from kubernetes.client import rest
@@ -204,7 +203,6 @@ class Kubernetes(service.Service):
 
         self.api = api
         self.v1_client = core_v1_api.CoreV1Api(api)
-        self.v1beta1_ext = extensions_v1beta1_api.ExtensionsV1beta1Api(api)
         self.v1_batch = batch_v1_api.BatchV1Api(api)
         self.v1_apps = apps_v1_api.AppsV1Api(api)
         self.v1_storage = storage_v1_api.StorageV1Api(api)
@@ -609,7 +607,7 @@ class Kubernetes(service.Service):
 
     @atomic.action_timer("kubernetes.get_replicaset")
     def get_replicaset(self, name, namespace, **kwargs):
-        return self.v1beta1_ext.read_namespaced_replica_set(
+        return self.v1_apps.read_namespaced_replica_set(
             name,
             namespace=namespace
         )
@@ -639,7 +637,7 @@ class Kubernetes(service.Service):
             container_spec["command"] = list(command)
 
         manifest = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "ReplicaSet",
             "metadata": {
                 "name": name,
@@ -672,7 +670,7 @@ class Kubernetes(service.Service):
         if not self._spec.get("serviceaccounts"):
             del manifest["spec"]["template"]["spec"]["serviceAccountName"]
 
-        self.v1beta1_ext.create_namespaced_replica_set(
+        self.v1_apps.create_namespaced_replica_set(
             namespace=namespace,
             body=manifest
         )
@@ -690,7 +688,7 @@ class Kubernetes(service.Service):
 
     @atomic.action_timer("kubernetes.scale_replicaset")
     def scale_replicaset(self, name, namespace, replicas, status_wait=True):
-        self.v1beta1_ext.patch_namespaced_replica_set(
+        self.v1_apps.patch_namespaced_replica_set(
             name,
             namespace=namespace,
             body={"spec": {"replicas": replicas}}
@@ -713,7 +711,7 @@ class Kubernetes(service.Service):
         :param namespace: replicaset namespace
         :param status_wait: wait for termination if True
         """
-        self.v1beta1_ext.delete_namespaced_replica_set(
+        self.v1_apps.delete_namespaced_replica_set(
             name,
             namespace=namespace,
             body=k8s_config.V1DeleteOptions()
@@ -729,7 +727,7 @@ class Kubernetes(service.Service):
 
     @atomic.action_timer("kubernetes.get_deployment")
     def get_deployment(self, name, namespace, **kwargs):
-        return self.v1beta1_ext.read_namespaced_deployment_status(
+        return self.v1_apps.read_namespaced_deployment_status(
             name=name,
             namespace=namespace
         )
@@ -771,7 +769,7 @@ class Kubernetes(service.Service):
             container_spec["resources"] = resources
 
         manifest = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "Deployment",
             "metadata": {
                 "name": name,
@@ -780,6 +778,11 @@ class Kubernetes(service.Service):
                 }
             },
             "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": app
+                    }
+                },
                 "replicas": replicas,
                 "template": {
                     "metadata": {
@@ -799,7 +802,7 @@ class Kubernetes(service.Service):
         if not self._spec.get("serviceaccounts"):
             del manifest["spec"]["template"]["spec"]["serviceAccountName"]
 
-        self.v1beta1_ext.create_namespaced_deployment(
+        self.v1_apps.create_namespaced_deployment(
             namespace=namespace,
             body=manifest
         )
@@ -843,7 +846,7 @@ class Kubernetes(service.Service):
                         "exclusive keys: image, env, resources."
             )
 
-        self.v1beta1_ext.patch_namespaced_deployment(
+        self.v1_apps.patch_namespaced_deployment(
             name=name,
             namespace=namespace,
             body=deployment
@@ -866,7 +869,7 @@ class Kubernetes(service.Service):
         :param namespace: deployment namespace
         :param status_wait: wait for termination if True
         """
-        self.v1beta1_ext.delete_namespaced_deployment(
+        self.v1_apps.delete_namespaced_deployment(
             name=name,
             namespace=namespace,
             body=k8s_config.V1DeleteOptions()
@@ -1164,7 +1167,7 @@ class Kubernetes(service.Service):
 
     @atomic.action_timer("kubernetes.get_daemonset")
     def get_daemonset(self, name, namespace, **kwargs):
-        return self.v1beta1_ext.read_namespaced_daemon_set(
+        return self.v1_apps.read_namespaced_daemon_set(
             name,
             namespace=namespace
         )
@@ -1195,12 +1198,17 @@ class Kubernetes(service.Service):
             container_spec["command"] = list(command)
 
         manifest = {
-            "apiVersion": "extensions/v1beta1",
+            "apiVersion": "apps/v1",
             "kind": "DaemonSet",
             "metadata": {
                 "name": name
             },
             "spec": {
+                "selector": {
+                    "matchLabels": {
+                        "app": app
+                    }
+                },
                 "template": {
                     "metadata": {
                         "name": name,
@@ -1219,7 +1227,7 @@ class Kubernetes(service.Service):
         if not self._spec.get("serviceaccounts"):
             del manifest["spec"]["template"]["spec"]["serviceAccountName"]
 
-        self.v1beta1_ext.create_namespaced_daemon_set(
+        self.v1_apps.create_namespaced_daemon_set(
             namespace=namespace,
             body=manifest
         )
@@ -1280,7 +1288,7 @@ class Kubernetes(service.Service):
         :param namespace: daemon set namespace
         :param status_wait: wait for termination if True
         """
-        self.v1beta1_ext.delete_namespaced_daemon_set(
+        self.v1_apps.delete_namespaced_daemon_set(
             name,
             namespace=namespace,
             body=k8s_config.V1DeleteOptions()
