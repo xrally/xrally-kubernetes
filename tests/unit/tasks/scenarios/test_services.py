@@ -81,7 +81,7 @@ class PodWithClusterIPSvcTestCase(test.TestCase):
         self.client.create_job.assert_called_once_with(
             name="test",
             namespace="ns",
-            image="appropriate/curl",
+            image="appropriate/curl:edge",
             command=["curl", "10.0.0.5:3030"],
             status_wait=True
         )
@@ -145,7 +145,7 @@ class PodWithClusterIPSvcTestCase(test.TestCase):
         self.client.create_job.assert_called_once_with(
             name="test",
             namespace="ns",
-            image="appropriate/curl",
+            image="appropriate/curl:edge",
             command=["curl", "192.168.0.3:80"],
             status_wait=True
         )
