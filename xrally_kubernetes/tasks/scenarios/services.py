@@ -93,7 +93,7 @@ class PodWithClusterIPSvc(common_scenario.BaseKubernetesScenario):
         self.client.create_job(
             name=name,
             namespace=namespace,
-            image="appropriate/curl",
+            image="appropriate/curl:edge",
             command=command,
             status_wait=True
         )
