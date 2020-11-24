@@ -30,13 +30,10 @@ class KubernetesServiceTestCase(test.TestCase):
         super(KubernetesServiceTestCase, self).setUp()
         from kubernetes import client as k8s_config
         from kubernetes.client import api_client
-        from kubernetes.client.apis import core_v1_api
+        from kubernetes.client.api import core_v1_api
 
-        if hasattr(k8s_config, "ConfigurationObject"):
-            p_mock_config = mock.patch.object(k8s_config,
-                                              "ConfigurationObject")
-        else:
-            p_mock_config = mock.patch.object(k8s_config, "Configuration")
+        p_mock_config = mock.patch.object(k8s_config.Configuration,
+                                          "get_default_copy")
         self.config_cls = p_mock_config.start()
         self.config = self.config_cls.return_value
         self.addCleanup(p_mock_config.stop)
@@ -88,10 +85,6 @@ class ServiceTestCase(KubernetesServiceTestCase):
         k8s_service = service.Kubernetes(spec)
 
         self.config_cls.assert_called_once()
-        if hasattr(k8s_config, "ConfigurationObject"):
-            self.assertEqual(3, k8s_service._k8s_client_version)
-        else:
-            self.assertEqual(4, k8s_service._k8s_client_version)
 
     def test___init___cert_without_tls(self):
         # setUp method called it
@@ -1101,7 +1094,7 @@ class ReplicaSetServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(ReplicaSetServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import apps_v1_api
+        from kubernetes.client.api import apps_v1_api
 
         p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()
@@ -1840,7 +1833,7 @@ class DeploymentServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(DeploymentServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import apps_v1_api
+        from kubernetes.client.api import apps_v1_api
 
         p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()
@@ -2235,7 +2228,7 @@ class JobServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(JobServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import batch_v1_api
+        from kubernetes.client.api import batch_v1_api
 
         p_mock_client = mock.patch.object(batch_v1_api, "BatchV1Api")
         self.client_cls = p_mock_client.start()
@@ -2469,7 +2462,7 @@ class StatefulSetServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(StatefulSetServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import apps_v1_api
+        from kubernetes.client.api import apps_v1_api
 
         p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()
@@ -3173,8 +3166,8 @@ class DaemonSetServiceTestCase(KubernetesServiceTestCase):
     def setUp(self):
         super(DaemonSetServiceTestCase, self).setUp()
 
-        from kubernetes.client.apis import apps_v1_api
-        from kubernetes.client.apis import core_v1_api
+        from kubernetes.client.api import apps_v1_api
+        from kubernetes.client.api import core_v1_api
 
         p_mock_client = mock.patch.object(apps_v1_api, "AppsV1Api")
         self.client_cls = p_mock_client.start()

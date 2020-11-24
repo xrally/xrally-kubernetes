@@ -13,4 +13,4 @@ requests                                           # Apache License Version 2.0
 
 rally>=1.2.0
 
-kubernetes>=5.0.0                                   # Apache License Version 2.0
+kubernetes>=12.0.0                                 # Apache License Version 2.0

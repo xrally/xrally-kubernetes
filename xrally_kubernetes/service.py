@@ -16,11 +16,11 @@ import re
 
 from kubernetes import client as k8s_config
 from kubernetes.client import api_client
-from kubernetes.client.apis import apps_v1_api
-from kubernetes.client.apis import batch_v1_api
-from kubernetes.client.apis import core_v1_api
-from kubernetes.client.apis import storage_v1_api
-from kubernetes.client.apis import version_api
+from kubernetes.client.api import apps_v1_api
+from kubernetes.client.api import batch_v1_api
+from kubernetes.client.api import core_v1_api
+from kubernetes.client.api import storage_v1_api
+from kubernetes.client.api import version_api
 from kubernetes.client import rest
 from kubernetes.stream import stream
 from rally.common import cfg
@@ -164,24 +164,7 @@ class Kubernetes(service.Service):
                                          name_generator=name_generator,
                                          atomic_inst=atomic_inst)
         self._spec = spec
-
-        # NOTE(andreykurilin): KubernetesClient doesn't provide any __version__
-        #   property to identify the client version (you are welcome to fix
-        #   this code if I'm wrong). Let's check for some backward incompatible
-        #   changes to identify the way to communicate with it.
-        if hasattr(k8s_config, "ConfigurationObject"):
-            # Actually, it is `k8sclient < 4.0.0`, so it can be
-            #   kubernetesclient 2.0 or even less, but it doesn't make any
-            #   difference for us
-            self._k8s_client_version = 3
-        else:
-            self._k8s_client_version = 4
-
-        if self._k8s_client_version == 3:
-            config = k8s_config.ConfigurationObject()
-        else:
-            config = k8s_config.Configuration()
-
+        config = k8s_config.Configuration.get_default_copy()
         config.host = self._spec["server"]
         config.ssl_ca_cert = self._spec["certificate-authority"]
         if self._spec.get("api_key"):
@@ -194,13 +177,8 @@ class Kubernetes(service.Service):
             config.key_file = self._spec["client-key"]
             if self._spec.get("tls_insecure", False):
                 config.verify_ssl = False
-
         config.assert_hostname = False
-        if self._k8s_client_version == 3:
-            api = api_client.ApiClient(config=config)
-        else:
-            api = api_client.ApiClient(configuration=config)
-
+        api = api_client.ApiClient(configuration=config)
         self.api = api
         self.v1_client = core_v1_api.CoreV1Api(api)
         self.v1_batch = batch_v1_api.BatchV1Api(api)
@@ -219,7 +197,7 @@ class Kubernetes(service.Service):
             return {}
 
         kube_config.load_kube_config()
-        k8s_cfg = k8s_config.Configuration()
+        k8s_cfg = k8s_config.Configuration.get_default_copy()
         return {
             "host": k8s_cfg.host,
             "certificate-authority": k8s_cfg.ssl_ca_cert,
