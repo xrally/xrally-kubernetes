@@ -23,19 +23,39 @@ class NamespaceContext(common_context.BaseKubernetesContext):
 
     CONFIG_SCHEMA = {
         "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "count": {
-                "type": "integer",
-                "minimum": 1
+        "oneOf": [
+            {
+                "description": "Create number of namespaces in kubernetes env",
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "with_serviceaccount": {
+                        "type": "boolean"
+                    },
+                    "namespace_choice_method": {
+                        "enum": ["random", "round_robin"]
+                    }
+                },
+                "required": ["count"],
+                "additionalProperties": False
             },
-            "with_serviceaccount": {
-                "type": "boolean"
+            {
+                "description": "Select from specified namespaces, which "
+                               "already exists in kubernetes env",
+                "properties": {
+                    "namespaces": {
+                        "type": "array"
+                    },
+                    "namespace_choice_method": {
+                        "enum": ["random", "round_robin"]
+                    }
+                },
+                "required": ["namespaces"],
+                "additionalProperties": False
             },
-            "namespace_choice_method": {
-                "enum": ["random", "round_robin"]
-            }
-        }
+        ]
     }
 
     DEFAULT_CONFIG = {"namespace_choice_method": "random"}
@@ -47,13 +67,19 @@ class NamespaceContext(common_context.BaseKubernetesContext):
         })
 
         self.context["kubernetes"].setdefault("namespaces", [])
-        for _ in range(self.config.get("count")):
-            name = self.client.create_namespace(status_wait=False)
-            self.context["kubernetes"]["namespaces"].append(name)
-            if self.config.get("with_serviceaccount"):
-                self.client.create_serviceaccount(name, namespace=name)
-                self.client.create_secret(name, namespace=name)
+        if self.config.get("count"):
+            for _ in range(self.config.get("count")):
+                name = self.client.create_namespace(status_wait=False)
+                self.context["kubernetes"]["namespaces"].append(name)
+                if self.config.get("with_serviceaccount"):
+                    self.client.create_serviceaccount(name, namespace=name)
+                    self.client.create_secret(name, namespace=name)
+        else:
+            self.context["kubernetes"]["namespaces"].extend(
+                self.config.get("namespaces")
+            )
 
     def cleanup(self):
-        for name in self.context["kubernetes"].get("namespaces"):
-            self.client.delete_namespace(name)
+        if self.config.get("count"):
+            for name in self.context["kubernetes"].get("namespaces"):
+                self.client.delete_namespace(name)
