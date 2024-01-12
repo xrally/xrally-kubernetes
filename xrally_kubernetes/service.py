@@ -238,7 +238,8 @@ class Kubernetes(service.Service):
             "metadata": {
                 "name": name,
                 "labels": {
-                    "role": name
+                    "role": name,
+                    "pod-security.kubernetes.io/enforce": "baseline"
                 }
             }
         }
