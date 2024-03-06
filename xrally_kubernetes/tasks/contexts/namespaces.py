@@ -13,6 +13,7 @@
 #    under the License.
 
 from rally.task import context
+from rally.common import utils as commonutils
 
 from xrally_kubernetes.tasks import context as common_context
 
@@ -34,6 +35,10 @@ class NamespaceContext(common_context.BaseKubernetesContext):
             },
             "namespace_choice_method": {
                 "enum": ["random", "round_robin"]
+            },
+            "serviceaccount_delay": {
+                "type": "integer",
+                "minimum": 0
             }
         }
     }
@@ -43,7 +48,8 @@ class NamespaceContext(common_context.BaseKubernetesContext):
     def setup(self):
         self.context["kubernetes"].update({
             "namespace_choice_method": self.config["namespace_choice_method"],
-            "serviceaccounts": self.config.get("with_serviceaccount") or False
+            "serviceaccounts": self.config.get("with_serviceaccount") or False,
+            "serviceaccount_delay": self.config.get("serviceaccount_delay") or 0
         })
 
         self.context["kubernetes"].setdefault("namespaces", [])
@@ -53,6 +59,9 @@ class NamespaceContext(common_context.BaseKubernetesContext):
             if self.config.get("with_serviceaccount"):
                 self.client.create_serviceaccount(name, namespace=name)
                 self.client.create_secret(name, namespace=name)
+                commonutils.interruptable_sleep(
+                    self.context["kubernetes"]["serviceaccount_delay"]
+                )
 
     def cleanup(self):
         for name in self.context["kubernetes"].get("namespaces"):
