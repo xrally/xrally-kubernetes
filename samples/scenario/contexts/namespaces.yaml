@@ -13,3 +13,15 @@ subtasks:
     namespaces:
       count: 4
       with_serviceaccount: true
+- title: Run a single workload with create/read/delete pod
+  scenario:
+    Kubernetes.create_and_delete_pod:
+      image: kubernetes/pause
+  runner:
+    constant:
+      concurrency: 2
+      times: 10
+  contexts:
+    namespaces:
+      namespaces:
+      - default

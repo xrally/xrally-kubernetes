@@ -132,3 +132,20 @@ class NamespacesContextTestCase(test.TestCase):
         self.assertEqual(3, self.client.create_namespace.call_count)
         self.assertEqual(3, self.client.create_serviceaccount.call_count)
         self.assertEqual(3, self.client.create_secret.call_count)
+
+    def test_namespaces_context_specify_namespaces(self):
+        old_config = copy.deepcopy(self.ctx.config)
+        old_config.update({
+            "namespaces": ["default", "non-default"],
+            "namespace_choice_method": "round_robin"
+        })
+        self.ctx.config = old_config
+        self.ctx.setup()
+
+        self.assertEqual(["default", "non-default"],
+                         self.ctx.context["kubernetes"]["namespaces"])
+        self.assertEqual(
+            "round_robin",
+            self.ctx.context["kubernetes"]["namespace_choice_method"]
+        )
+        self.assertFalse(self.ctx.context["kubernetes"]["serviceaccounts"])
